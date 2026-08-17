@@ -92,6 +92,12 @@ class User(TimestampMixin, Base):
         foreign_keys="InventoryTransaction.created_by",
     )
 
+    auth_sessions: Mapped[list["AuthSession"]] = relationship(
+        "AuthSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
 
 class UserRole(Base):
     __tablename__ = "user_roles"

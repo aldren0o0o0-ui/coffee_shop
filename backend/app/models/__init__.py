@@ -1,4 +1,5 @@
 from app.models.customer import Customer
+from app.models.auth_session import AuthSession
 from app.models.inventory import (
     InventoryItem,
     InventoryTransaction,
@@ -26,6 +27,8 @@ from app.models.user import User, UserRole
 
 
 __all__ = [
+    "AuthSession",
+
     "Role",
     "User",
     "UserRole",

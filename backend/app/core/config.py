@@ -1,15 +1,21 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
-    app_name: str="ldrn's Coffee Shop Management System"
-    app_env: str="development"
-    debug: bool=False
+    app_name: str = "Coffee Shop Management System"
+    app_env: str = "development"
+    debug: bool = False
 
     database_url: str
     frontend_url: str = "http://localhost:5173"
     secret_key: str
+
+    session_cookie_name: str = "ldrndc_session"
+    session_lifetime_hours: int = Field(default=8, ge=1, le=168)
+    session_cookie_secure: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

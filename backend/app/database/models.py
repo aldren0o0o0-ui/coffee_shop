@@ -1,6 +1,7 @@
 from app.database.base import Base
 
 from app.models import (
+    AuthSession,
     Customer,
     InventoryItem,
     InventoryTransaction,
@@ -24,6 +25,8 @@ from app.models import (
 
 __all__ = [
     "Base",
+
+    "AuthSession",
 
     "Role",
     "User",
