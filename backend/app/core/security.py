@@ -49,3 +49,18 @@ def verify_password_safely(
         )
     except Exception:
         return False
+
+
+TEMPORARY_PASSWORD_BYTES = 18
+
+
+def generate_temporary_password() -> str:
+    """
+    Generate a strong temporary password.
+
+    The returned password must be shown only once and must never
+    be stored in plaintext or written to logs.
+    """
+    return secrets.token_urlsafe(
+        TEMPORARY_PASSWORD_BYTES,
+    )

@@ -43,6 +43,12 @@ class User(TimestampMixin, Base):
         nullable=False,
     )
 
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
     first_name: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
