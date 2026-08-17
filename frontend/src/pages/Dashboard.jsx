@@ -1,101 +1,75 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-
 import { useAuth } from "../auth/AuthContext";
 
 
 export default function Dashboard() {
-  const [isSigningOut, setIsSigningOut] =
-    useState(false);
-
-  const {
-    user,
-    logout,
-    hasRole,
-  } = useAuth();
-
-  const navigate = useNavigate();
-
-  async function handleLogout() {
-    setIsSigningOut(true);
-
-    try {
-      await logout();
-    } finally {
-      navigate("/login", {
-        replace: true,
-      });
-    }
-  }
+  const { user, hasRole } = useAuth();
 
   return (
-    <main className="min-h-screen bg-stone-100 p-4 sm:p-8">
-      <section className="mx-auto max-w-6xl">
-        <header className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-800">
-              ldrn&apos;s coffee
-            </p>
+    <div className="space-y-6">
+      <section className="rounded-2xl bg-amber-950 p-6 text-white shadow-sm sm:p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
+          Today at a glance
+        </p>
 
-            <h1 className="mt-2 text-2xl font-bold text-stone-900">
-              Welcome, {user.first_name}
-            </h1>
+        <h2 className="mt-3 text-3xl font-bold">
+          Good day, {user.first_name}
+        </h2>
 
-            <p className="mt-1 text-sm text-stone-600">
-              Signed in as {user.username}
-            </p>
-          </div>
+        <p className="mt-2 max-w-xl text-amber-100">
+          Review shop activity and continue where your
+          team left off.
+        </p>
+      </section>
 
-          <button
-            className="rounded-xl border border-stone-300 px-4 py-2 font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSigningOut}
-            onClick={handleLogout}
-            type="button"
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Today’s sales", "No sales yet"],
+          ["Orders", "No orders yet"],
+          ["Items running low", "No alerts"],
+          ["Team on duty", "Not configured"],
+        ].map(([label, value]) => (
+          <article
+            className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
+            key={label}
           >
-            {isSigningOut ? "Signing out…" : "Sign out"}
-          </button>
-        </header>
+            <p className="text-sm text-stone-500">
+              {label}
+            </p>
 
-        <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
+            <p className="mt-3 text-xl font-bold text-stone-900">
+              {value}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      {hasRole("owner") && (
+        <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-bold text-stone-900">
-            Your workspace
+            Owner shortcuts
           </h2>
 
           <p className="mt-2 text-stone-600">
-            Your authenticated application is ready.
+            Common tasks for managing your coffee shop.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            {user.roles.map((role) => (
-              <span
-                className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900"
-                key={role.role_name}
-              >
-                {role.role_name}
-              </span>
-            ))}
-          </div>
-
-          {hasRole("owner") && (
-            <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
-              <h3 className="font-bold text-amber-950">
-                Team management
-              </h3>
-
-              <p className="mt-1 text-sm text-amber-900">
-                Your Owner account can add and manage team members.
-              </p>
-
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              "Add a team member",
+              "Update the menu",
+              "Review stock",
+            ].map((label) => (
               <button
-                className="mt-4 rounded-xl bg-amber-900 px-4 py-2 font-semibold text-white"
+                className="rounded-xl border border-stone-200 p-4 text-left font-semibold text-stone-800 transition hover:border-amber-300 hover:bg-amber-50"
+                key={label}
                 type="button"
               >
-                Manage team
+                {label}
               </button>
-            </div>
-          )}
+            ))}
+          </div>
         </section>
-      </section>
-    </main>
+      )}
+    </div>
   );
 }
