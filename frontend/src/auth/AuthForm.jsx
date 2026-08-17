@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import { useAuth } from "./AuthContext";
 
 const INITIAL_FORM = {
   identifier: "",
@@ -11,6 +14,12 @@ function AuthForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { login } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [authenticationError, setAuthenticationError] = useState("");
+
   function handleChange(event) {
     const { name, value } = event.target;
 
@@ -19,12 +28,16 @@ function AuthForm() {
       [name]: value,
     }));
 
+    setAuthenticationError("");
+
+
     if (errors[name]) {
       setErrors((currentErrors) => ({
         ...currentErrors,
         [name]: "",
       }));
     }
+
   }
 
   function validateForm() {
@@ -36,8 +49,6 @@ function AuthForm() {
 
     if (!form.password) {
       nextErrors.password = "Enter your password.";
-    } else if (form.password.length < 8) {
-      nextErrors.password = "Password must contain at least 8 characters.";
     }
 
     return nextErrors;
@@ -56,11 +67,45 @@ function AuthForm() {
     setErrors({});
     setIsSubmitting(true);
 
-    try {
-      // Stage 4 will replace this with a real authentication request.
-      console.log("Validated login form", {
+        try {
+      setAuthenticationError("");
+
+      await login({
         identifier: form.identifier.trim(),
+        password: form.password,
       });
+
+      setForm(INITIAL_FORM);
+
+      const destination =
+        location.state?.from?.pathname ?? "/";
+
+      navigate(destination, {
+        replace: true,
+      });
+    } catch (error) {
+      setForm((currentForm) => ({
+        ...currentForm,
+        password: "",
+      }));
+
+      if (error.response?.status === 401) {
+        setAuthenticationError(
+          "The sign-in details you entered are incorrect.",
+        );
+      } else if (error.code === "ECONNABORTED") {
+        setAuthenticationError(
+          "The server took too long to respond. Please try again.",
+        );
+      } else if (!error.response) {
+        setAuthenticationError(
+          "We could not connect to the server.",
+        );
+      } else {
+        setAuthenticationError(
+          "We could not sign you in. Please try again.",
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -103,6 +148,15 @@ function AuthForm() {
             <p className="mt-2 text-stone-600">
               Sign in using your staff account.
             </p>
+
+            {authenticationError && (
+              <div
+                className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                role="alert"
+              >
+                {authenticationError}
+              </div>
+            )}
 
             <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
               <div>
