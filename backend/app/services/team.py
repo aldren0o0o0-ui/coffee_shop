@@ -138,42 +138,39 @@ def create_team_member(
         must_change_password=True,
     )
 
-    
-
     try:
         database.add(user)
         database.flush()
 
-        database.add(UserRole(
-            user_id = user.user_id, 
-            role_id = role.role_id,
-            is_active = True
+        database.add(
+            UserRole(
+                user_id=user.user_id,
+                role_id=role.role_id,
+                is_active=True,
             )
         )
 
         database.commit()
+
     except IntegrityError as error:
         database.rollback()
 
         raise DuplicateTeamMemberError from error
 
-    statement = {
-        select(User).options(
+    statement = (
+        select(User)
+        .options(
             selectinload(User.user_roles)
             .selectinload(UserRole.role)
         )
         .where(User.user_id == user.user_id)
-    }
+    )
 
-    # database.refresh(user)
+    created_user = database.scalars(
+        statement
+    ).one()
 
-    # # Retain the already loaded relationship for serialization.
-    # user.user_roles = [user_role]
-
-    created_user = database.scalar(statement)
-
-    return create_user, temporary_password
-
+    return created_user, temporary_password
 
 def list_team_members(
     database: Session,
