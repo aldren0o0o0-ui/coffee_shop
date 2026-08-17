@@ -28,6 +28,18 @@ class DuplicateTeamMemberError(Exception):
     pass
 
 
+class TeamMemberDatabaseError(Exception):
+    def __init__(
+        self,
+        constraint_name: str | None,
+    ) -> None:
+        self.constraint_name = constraint_name
+
+        super().__init__(
+            "The database rejected the team member."
+        )
+
+
 class StaffRoleUnavailableError(Exception):
     pass
 
@@ -155,7 +167,26 @@ def create_team_member(
     except IntegrityError as error:
         database.rollback()
 
-        raise DuplicateTeamMemberError from error
+        diagnostics = getattr(
+            getattr(error, "orig", None),
+            "diag",
+            None,
+        )
+        constraint_name = getattr(
+            diagnostics,
+            "constraint_name",
+            None,
+        )
+
+        if constraint_name in {
+            "ix_users_username",
+            "ix_users_email",
+        }:
+            raise DuplicateTeamMemberError from error
+
+        raise TeamMemberDatabaseError(
+            constraint_name,
+        ) from error
 
     statement = (
         select(User)
@@ -171,6 +202,7 @@ def create_team_member(
     ).one()
 
     return created_user, temporary_password
+
 
 def list_team_members(
     database: Session,

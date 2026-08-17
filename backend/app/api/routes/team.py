@@ -16,6 +16,7 @@ from app.schemas.team import (
 from app.services.team import (
     DuplicateTeamMemberError,
     StaffRoleUnavailableError,
+    TeamMemberDatabaseError,
     create_team_member,
     list_team_members,
     serialize_team_member,
@@ -65,6 +66,14 @@ def add_team_member(
             detail=(
                 "A team member already uses that "
                 "username or email address."
+            ),
+        ) from error
+    except TeamMemberDatabaseError as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "The account could not be created. "
+                "Please try again or contact support."
             ),
         ) from error
     except StaffRoleUnavailableError as error:
