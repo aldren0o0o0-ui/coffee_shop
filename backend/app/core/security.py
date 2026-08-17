@@ -33,3 +33,19 @@ def generate_session_token() -> str:
 def hash_session_token(token: str) -> str:
     """Create the database-safe representation of a session token."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+def verify_password_safely(
+    plain_password: str,
+    password_hash: str,
+) -> bool:
+    """
+    Verify a password without allowing a malformed stored hash
+    to crash the authentication endpoint.
+    """
+    try:
+        return verify_password(
+            plain_password,
+            password_hash,
+        )
+    except Exception:
+        return False
