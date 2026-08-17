@@ -137,5 +137,6 @@ def serialize_current_user(
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
+        must_change_password = user.must_change_password,
         roles=roles,
     )
