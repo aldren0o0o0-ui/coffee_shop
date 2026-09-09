@@ -6,8 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.database.session import SessionLocal
-from app.models.role import Role
-from app.models.user import User, UserRole
+from app.modules.users.models import Role, User, UserRole
 
 
 OWNER_ROLE_NAME = "owner"

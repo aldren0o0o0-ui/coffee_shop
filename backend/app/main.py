@@ -1,21 +1,58 @@
+import asyncio
+from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.health import router as health_router
-from app.api.routes.auth import router as auth_router
-from app.api.router.team import router as team_router
+from app.modules.auth.routes import router as auth_router
+from app.modules.users.routes import router as team_router
+from app.modules.analytics.routes import router as dashboard_router
+from app.modules.orders.routes import (
+    customer_router,
+    router as orders_router,
+)
+from app.modules.menu.routes import router as menu_router
+from app.modules.inventory.routes import router as inventory_router
+from app.modules.procurement.routes import router as procurement_router
+from app.modules.customers.routes import router as customers_router
+from app.modules.payments.routes import router as payments_router
+from app.modules.orders.jobs import run_order_expiry_sweep_loop
+from app.modules.menu.jobs import run_draft_cleanup_loop
 
 from app.core.config import settings
 
+# Ensure upload directory exists
+Path("uploads/menu").mkdir(parents=True, exist_ok=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start background order expiry sweep task and draft cleaner
+    sweep_task = asyncio.create_task(run_order_expiry_sweep_loop(interval_seconds=60))
+    draft_cleanup_task = asyncio.create_task(run_draft_cleanup_loop(interval_hours=6))
+    try:
+        yield
+    finally:
+        sweep_task.cancel()
+        draft_cleanup_task.cancel()
+
+
 app = FastAPI(
-    title = settings.app_name,
-    version = "0.1.0",
-    description = "API for ldrn's Coffee Shop Management System",
+    title=settings.app_name,
+    version="0.2.0",
+    description="API for ldrn's Coffee Shop Management System with live dashboards & guest online orders",
+    lifespan=lifespan,
 )
+
+# Serve uploaded static media
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=settings.cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,10 +61,18 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(team_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(customer_router, prefix="/api/v1")
+app.include_router(orders_router, prefix="/api/v1")
+app.include_router(menu_router, prefix="/api/v1")
+app.include_router(inventory_router, prefix="/api/v1")
+app.include_router(procurement_router, prefix="/api/v1")
+app.include_router(customers_router, prefix="/api/v1")
+app.include_router(payments_router, prefix="/api/v1")
 
 
 @app.get("/")
 def root() -> dict[str, str]:
     return {
         "message": "Welcome to ldrn's Coffee Shop Management System API!"
-    }
+    }

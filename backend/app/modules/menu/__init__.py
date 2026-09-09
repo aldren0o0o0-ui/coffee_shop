@@ -1,0 +1,1 @@
+"""Menu & Catalog module package."""

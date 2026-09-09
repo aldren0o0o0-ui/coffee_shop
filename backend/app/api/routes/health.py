@@ -27,4 +27,4 @@ def check_health_db(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database connection failed"
-        ) from exc
+        ) from e

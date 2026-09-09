@@ -5,8 +5,9 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../modules/auth/context/useAuth";
 import Sidebar from "../components/Sidebar";
+import ChangePasswordModal from "../modules/auth/components/ChangePasswordModal";
 
 
 const pageTitles = {
@@ -24,14 +25,20 @@ const pageTitles = {
 
 
 export default function AppLayout() {
-  const [isSidebarOpen, setIsSidebarOpen] =
-    useState(false);
-  const [isSigningOut, setIsSigningOut] =
-    useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const { user, logout } = useAuth();
+  const {
+    user,
+    logout,
+    isPasswordModalOpen,
+    openPasswordModal,
+    closePasswordModal,
+  } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const isForcedPasswordChange = Boolean(user?.must_change_password);
 
   useEffect(() => {
     setIsSidebarOpen(false);
@@ -39,7 +46,7 @@ export default function AppLayout() {
 
   useEffect(() => {
     function closeWithEscape(event) {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !isForcedPasswordChange) {
         setIsSidebarOpen(false);
       }
     }
@@ -52,7 +59,7 @@ export default function AppLayout() {
         closeWithEscape,
       );
     };
-  }, []);
+  }, [isForcedPasswordChange]);
 
   async function handleLogout() {
     setIsSigningOut(true);
@@ -74,6 +81,7 @@ export default function AppLayout() {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        onOpenPasswordModal={openPasswordModal}
         user={user}
       />
 
@@ -103,16 +111,30 @@ export default function AppLayout() {
             </div>
           </div>
 
-          <button
-            className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={isSigningOut}
-            onClick={handleLogout}
-            type="button"
-          >
-            {isSigningOut
-              ? "Signing out…"
-              : "Sign out"}
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              aria-label="Change Password"
+              className="hidden items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-xs font-semibold text-stone-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-950 sm:flex"
+              onClick={openPasswordModal}
+              type="button"
+            >
+              <svg className="h-4 w-4 text-stone-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Password</span>
+            </button>
+
+            <button
+              className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isSigningOut}
+              onClick={handleLogout}
+              type="button"
+            >
+              {isSigningOut
+                ? "Signing out…"
+                : "Sign out"}
+            </button>
+          </div>
         </header>
 
         <main className="p-4 sm:p-8">
@@ -121,6 +143,13 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
+
+      {/* Force or Voluntary Password Change Modal */}
+      <ChangePasswordModal
+        isForced={isForcedPasswordChange}
+        isOpen={isForcedPasswordChange || isPasswordModalOpen}
+        onClose={closePasswordModal}
+      />
     </div>
   );
-}
+}

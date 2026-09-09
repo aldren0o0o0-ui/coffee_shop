@@ -15,7 +15,21 @@ class Settings(BaseSettings):
 
     session_cookie_name: str = "ldrndc_session"
     session_lifetime_hours: int = Field(default=8, ge=1, le=168)
+    # Set SESSION_COOKIE_SECURE=true in production environment variables over HTTPS (SEC-6)
     session_cookie_secure: bool = False
+
+    @property
+    def cors_origins(self) -> list[str]:
+        raw_origins = [o.strip() for o in self.frontend_url.split(",") if o.strip()]
+        dev_origins = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+        ]
+        return list(dict.fromkeys(raw_origins + dev_origins))
 
     model_config = SettingsConfigDict(
         env_file=".env",

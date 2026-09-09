@@ -1,30 +1,32 @@
-from app.models.customer import Customer
-from app.models.auth_session import AuthSession
-from app.models.inventory import (
-    InventoryItem,
-    InventoryTransaction,
-)
-from app.models.loyalty import LoyaltyTransaction
-from app.models.menu import (
+from app.modules.auth.models import AuthSession
+from app.modules.users.models import Role, User, UserRole
+from app.modules.menu.models import (
     MenuCategory,
     MenuItem,
     MenuItemAddon,
+    MenuItemImage,
     MenuItemIngredient,
     MenuItemSize,
 )
-from app.models.order import (
-    Order,
-    OrderItem,
-    OrderItemAddon,
-    Payment,
+from app.modules.inventory.models import (
+    InventoryItem,
+    InventoryTransaction,
 )
-from app.models.purchase import (
+from app.modules.procurement.models import (
     PurchaseRequest,
     PurchaseRequestItem,
 )
-from app.models.role import Role
-from app.models.user import User, UserRole
 
+from app.modules.customers.models import (
+    Customer,
+    LoyaltyTransaction,
+)
+from app.modules.payments.models import Payment
+from app.modules.orders.models import (
+    Order,
+    OrderItem,
+    OrderItemAddon,
+)
 
 __all__ = [
     "AuthSession",
@@ -38,9 +40,13 @@ __all__ = [
     "MenuItemSize",
     "MenuItemAddon",
     "MenuItemIngredient",
+    "MenuItemImage",
 
     "InventoryItem",
     "InventoryTransaction",
+
+    "PurchaseRequest",
+    "PurchaseRequestItem",
 
     "Customer",
 
@@ -50,7 +56,4 @@ __all__ = [
     "Payment",
 
     "LoyaltyTransaction",
-
-    "PurchaseRequest",
-    "PurchaseRequestItem",
 ]
