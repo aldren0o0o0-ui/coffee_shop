@@ -115,3 +115,40 @@ class CombinedDashboardResponse(BaseModel):
     cashier_stats: CashierDashboardStats | None = None
     barista_stats: BaristaDashboardStats | None = None
     inventory_stats: InventoryStaffDashboardStats | None = None
+
+
+class TopSellingItem(BaseModel):
+    menu_item_id: int
+    item_name: str
+    quantity_sold: int
+    total_sales: Decimal
+
+
+class ChannelSales(BaseModel):
+    channel: str
+    order_count: int
+    total_sales: Decimal
+
+
+class PaymentMethodSales(BaseModel):
+    payment_method: str
+    transaction_count: int
+    total_amount: Decimal
+
+
+class TimelinePoint(BaseModel):
+    label: str
+    sales: Decimal
+    orders_count: int
+
+
+class StoreReportResponse(BaseModel):
+    period: str
+    total_revenue: Decimal
+    total_orders_count: int
+    completed_orders_count: int
+    average_order_value: Decimal
+    top_selling_items: list[TopSellingItem]
+    sales_by_channel: list[ChannelSales]
+    sales_by_payment_method: list[PaymentMethodSales]
+    timeline: list[TimelinePoint]

@@ -152,7 +152,7 @@ def test_cash_tender_validation_and_change_calculation():
     with pytest.raises(HTTPException) as exc_info:
         payments_service.validate_cash_tender(Decimal("15.50"), Decimal("10.00"))
     assert exc_info.value.status_code == 400
-    assert "Amount tendered ($10.00) must be at least total due ($15.50)" in str(exc_info.value.detail)
+    assert "Amount tendered (₱10.00) must be at least total due (₱15.50)" in str(exc_info.value.detail)
 
 
 def test_successful_online_payment_and_receipt_generation(db_session):

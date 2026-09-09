@@ -7,6 +7,7 @@ import {
   reorderProductImages,
   publishProduct,
 } from "../api/menuApi";
+import { createInventoryItem } from "../../inventory/api/inventoryApi";
 import { getImageUrl } from "../utils/image";
 
 export default function ProductWizardModal({
@@ -15,6 +16,7 @@ export default function ProductWizardModal({
   categories = [],
   inventoryOptions = [],
   onProductPublished,
+  onInventoryItemCreated,
 }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [draftId, setDraftId] = useState(null);
@@ -50,6 +52,89 @@ export default function ProductWizardModal({
 
   // Step 5: Recipe / Stock Link
   const [ingredients, setIngredients] = useState([]);
+  const [localInventoryOptions, setLocalInventoryOptions] = useState(inventoryOptions);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [quickAddForm, setQuickAddForm] = useState({
+    item_name: "",
+    unit_of_measure: "kg",
+    quantity_on_hand: "10",
+    reorder_level: "2",
+    unit_cost: "0",
+  });
+  const [isSubmittingQuickAdd, setIsSubmittingQuickAdd] = useState(false);
+  const [quickAddError, setQuickAddError] = useState("");
+  const [quickAddSuccess, setQuickAddSuccess] = useState("");
+
+  useEffect(() => {
+    setLocalInventoryOptions(inventoryOptions);
+  }, [inventoryOptions]);
+
+  async function handleQuickAddIngredient(e) {
+    e.preventDefault();
+    if (!quickAddForm.item_name.trim()) {
+      setQuickAddError("Please enter an ingredient name.");
+      return;
+    }
+    setIsSubmittingQuickAdd(true);
+    setQuickAddError("");
+    try {
+      const newItem = await createInventoryItem({
+        item_name: quickAddForm.item_name.trim(),
+        unit_of_measure: quickAddForm.unit_of_measure.trim() || "unit",
+        quantity_on_hand: parseFloat(quickAddForm.quantity_on_hand) || 0,
+        reorder_level: parseFloat(quickAddForm.reorder_level) || 0,
+        unit_cost: parseFloat(quickAddForm.unit_cost) || 0,
+        is_active: true,
+      });
+
+      const formattedItem = {
+        inventory_item_id: newItem.inventory_item_id,
+        item_name: newItem.item_name,
+        unit_of_measure: newItem.unit_of_measure,
+        quantity_on_hand: newItem.quantity_on_hand,
+      };
+
+      setLocalInventoryOptions((prev) => [...prev, formattedItem]);
+
+      const defaultQty =
+        newItem.unit_of_measure === "g"
+          ? "18"
+          : newItem.unit_of_measure === "ml"
+          ? "200"
+          : "0.020";
+
+      setIngredients((prev) => [
+        ...prev,
+        {
+          inventory_item_id: String(newItem.inventory_item_id),
+          quantity_required: defaultQty,
+          unit_of_measure: newItem.unit_of_measure,
+        },
+      ]);
+
+      if (onInventoryItemCreated) {
+        onInventoryItemCreated(formattedItem);
+      }
+
+      setQuickAddSuccess(`Added "${newItem.item_name}" to inventory & linked to recipe!`);
+      setTimeout(() => {
+        setQuickAddSuccess("");
+        setIsQuickAddOpen(false);
+        setQuickAddForm({
+          item_name: "",
+          unit_of_measure: "kg",
+          quantity_on_hand: "10",
+          reorder_level: "2",
+          unit_cost: "0",
+        });
+      }, 1000);
+    } catch (err) {
+      console.error("Quick add ingredient failed:", err);
+      setQuickAddError(err.response?.data?.detail || "Failed to create ingredient.");
+    } finally {
+      setIsSubmittingQuickAdd(false);
+    }
+  }
 
   // Step 6: Availability & Preview
   const [isAvailable, setIsAvailable] = useState(true);
@@ -115,7 +200,7 @@ export default function ProductWizardModal({
     const newErrors = {};
     const priceNum = parseFloat(basePrice);
     if (isNaN(priceNum) || priceNum < 0) {
-      newErrors.basePrice = "Please enter a valid starting price ($0.00 or higher).";
+      newErrors.basePrice = "Please enter a valid starting price (₱0.00 or higher).";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -767,7 +852,7 @@ export default function ProductWizardModal({
                   What is the standard base price? <span className="text-amber-700">*</span>
                 </label>
                 <div className="relative max-w-xs">
-                  <span className="absolute left-3.5 top-2.5 text-sm font-bold text-stone-400">$</span>
+                  <span className="absolute left-3.5 top-2.5 text-sm font-bold text-stone-400">₱</span>
                   <input
                     type="number"
                     step="0.05"
@@ -841,7 +926,7 @@ export default function ProductWizardModal({
                             className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium"
                           />
                           <div className="flex items-center gap-1">
-                            <span className="text-xs font-semibold text-stone-400">+$</span>
+                            <span className="text-xs font-semibold text-stone-400">+₱</span>
                             <input
                               type="number"
                               step="0.05"
@@ -925,7 +1010,7 @@ export default function ProductWizardModal({
                     />
 
                     <div className="flex items-center gap-1">
-                      <span className="text-xs font-semibold text-stone-400">+$</span>
+                      <span className="text-xs font-semibold text-stone-400">+₱</span>
                       <input
                         type="number"
                         step="0.05"
@@ -977,9 +1062,18 @@ export default function ProductWizardModal({
                     Connect this recipe to inventory items to enable automatic stock deduction.
                   </p>
                 </div>
-                <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-600">
-                  Optional
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickAddOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-xs hover:bg-amber-100 transition"
+                  >
+                    <span>+ Quick-Add Ingredient</span>
+                  </button>
+                  <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-600">
+                    Optional
+                  </span>
+                </div>
               </div>
 
               {/* Informational Banner */}
@@ -993,86 +1087,129 @@ export default function ProductWizardModal({
                 </div>
               </div>
 
-              {/* Ingredients List */}
-              <div className="space-y-2">
-                {ingredients.map((ing, idx) => {
-                  const selectedInv = inventoryOptions.find(
-                    (i) => i.inventory_item_id.toString() === ing.inventory_item_id?.toString()
-                  );
-                  return (
-                    <div
-                      key={idx}
-                      className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white p-2.5 shadow-xs"
+              {/* Empty state when no inventory items exist */}
+              {localInventoryOptions.length === 0 ? (
+                <div className="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/50 p-6 text-center">
+                  <span className="text-3xl">☕</span>
+                  <h4 className="mt-2 text-sm font-bold text-amber-950">No Stock Ingredients Found</h4>
+                  <p className="mt-1 text-xs text-stone-600 max-w-md mx-auto">
+                    To track stock and calculate costs, add your raw ingredients (e.g., Espresso Beans, Whole Milk, Syrups). You can quick-add an ingredient right now without leaving this wizard!
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickAddOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-amber-800 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-900 transition"
                     >
-                      <select
-                        value={ing.inventory_item_id || ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const inv = inventoryOptions.find(
-                            (i) => i.inventory_item_id.toString() === val
-                          );
-                          const copy = [...ingredients];
-                          copy[idx] = {
-                            ...copy[idx],
-                            inventory_item_id: val,
-                            unit_of_measure: inv ? inv.unit_of_measure : "unit",
-                          };
-                          setIngredients(copy);
-                        }}
-                        className="min-w-[180px] flex-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>+ Quick-Add Ingredient</span>
+                    </button>
+                    <a
+                      href="/inventory"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-white px-3.5 py-2 text-xs font-semibold text-amber-900 shadow-xs hover:bg-amber-50 transition"
+                    >
+                      <span>Open Stock & Ingredients ↗</span>
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                /* Ingredients List */
+                <div className="space-y-2">
+                  {ingredients.map((ing, idx) => {
+                    const selectedInv = localInventoryOptions.find(
+                      (i) => i.inventory_item_id.toString() === ing.inventory_item_id?.toString()
+                    );
+                    return (
+                      <div
+                        key={idx}
+                        className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white p-2.5 shadow-xs"
                       >
-                        <option value="">Select ingredient...</option>
-                        {inventoryOptions.map((inv) => (
-                          <option key={inv.inventory_item_id} value={inv.inventory_item_id}>
-                            {inv.item_name} ({inv.quantity_on_hand} {inv.unit_of_measure} in stock)
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          step="0.001"
-                          min="0.001"
-                          value={ing.quantity_required}
+                        <select
+                          value={ing.inventory_item_id || ""}
                           onChange={(e) => {
+                            const val = e.target.value;
+                            const inv = localInventoryOptions.find(
+                              (i) => i.inventory_item_id.toString() === val
+                            );
                             const copy = [...ingredients];
-                            copy[idx].quantity_required = e.target.value;
+                            copy[idx] = {
+                              ...copy[idx],
+                              inventory_item_id: val,
+                              unit_of_measure: inv ? inv.unit_of_measure : "unit",
+                            };
                             setIngredients(copy);
                           }}
-                          placeholder="Amount"
-                          className="w-24 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs font-bold text-right"
-                        />
-                        <span className="text-xs font-bold text-stone-500 min-w-[32px]">
-                          {selectedInv ? selectedInv.unit_of_measure : "units"}
-                        </span>
+                          className="min-w-[180px] flex-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-semibold"
+                        >
+                          <option value="">Select ingredient...</option>
+                          {localInventoryOptions.map((inv) => (
+                            <option key={inv.inventory_item_id} value={inv.inventory_item_id}>
+                              {inv.item_name} ({inv.quantity_on_hand} {inv.unit_of_measure} in stock)
+                            </option>
+                          ))}
+                        </select>
+
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0.001"
+                            value={ing.quantity_required}
+                            onChange={(e) => {
+                              const copy = [...ingredients];
+                              copy[idx].quantity_required = e.target.value;
+                              setIngredients(copy);
+                            }}
+                            placeholder="Amount"
+                            className="w-24 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs font-bold text-right"
+                          />
+                          <span className="text-xs font-bold text-stone-500 min-w-[32px]">
+                            {selectedInv ? selectedInv.unit_of_measure : "units"}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}
+                          className="rounded p-1 text-stone-400 hover:text-red-600"
+                          title="Remove ingredient"
+                        >
+                          🗑️
+                        </button>
                       </div>
+                    );
+                  })}
 
-                      <button
-                        type="button"
-                        onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}
-                        className="rounded p-1 text-stone-400 hover:text-red-600"
-                        title="Remove ingredient"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  );
-                })}
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIngredients((prev) => [
+                          ...prev,
+                          { inventory_item_id: "", quantity_required: "0.020", unit_of_measure: "kg" },
+                        ])
+                      }
+                      className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 hover:underline"
+                    >
+                      + Link an ingredient
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setIngredients((prev) => [
-                      ...prev,
-                      { inventory_item_id: "", quantity_required: "0.020", unit_of_measure: "kg" },
-                    ])
-                  }
-                  className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-amber-800 hover:underline"
-                >
-                  + Link an ingredient
-                </button>
-              </div>
+                    <span className="text-stone-300 text-xs">|</span>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickAddOpen(true)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50/60 px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition"
+                    >
+                      + Quick-Add New Ingredient
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1176,7 +1313,7 @@ export default function ProductWizardModal({
                             >
                               {s.size_name || `Size ${idx + 1}`}{" "}
                               {parseFloat(s.price_adjustment) > 0 &&
-                                `(+$${parseFloat(s.price_adjustment).toFixed(2)})`}
+                                `(+₱${parseFloat(s.price_adjustment).toFixed(2)})`}
                             </span>
                           ))}
                         </div>
@@ -1246,6 +1383,152 @@ export default function ProductWizardModal({
           </div>
         </div>
       </div>
+
+      {/* QUICK-ADD INGREDIENT MODAL */}
+      {isQuickAddOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-stone-200">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-stone-900">
+                  Quick-Add Inventory Ingredient
+                </h3>
+                <p className="text-xs text-stone-500">
+                  Creates stock item & auto-links to this recipe.
+                </p>
+              </div>
+              <button
+                className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                onClick={() => {
+                  setIsQuickAddOpen(false);
+                  setQuickAddError("");
+                  setQuickAddSuccess("");
+                }}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            {quickAddSuccess && (
+              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                {quickAddSuccess}
+              </div>
+            )}
+            {quickAddError && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
+                {quickAddError}
+              </div>
+            )}
+
+            <form className="mt-3.5 space-y-3" onSubmit={handleQuickAddIngredient}>
+              <div>
+                <label className="block text-xs font-bold text-stone-700">
+                  Ingredient Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={quickAddForm.item_name}
+                  onChange={(e) => setQuickAddForm({ ...quickAddForm, item_name: e.target.value })}
+                  placeholder="e.g. Espresso Beans, Whole Milk, Oat Milk, Vanilla Syrup"
+                  className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-xs font-medium text-stone-900 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700">
+                    Unit of Measure
+                  </label>
+                  <input
+                    list="wizard-quick-unit-options"
+                    type="text"
+                    required
+                    value={quickAddForm.unit_of_measure}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, unit_of_measure: e.target.value })}
+                    placeholder="kg, g, L, ml, oz"
+                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-xs font-medium text-stone-900 focus:border-amber-500 focus:outline-none"
+                  />
+                  <datalist id="wizard-quick-unit-options">
+                    <option value="kg" />
+                    <option value="g" />
+                    <option value="L" />
+                    <option value="ml" />
+                    <option value="oz" />
+                    <option value="shots" />
+                    <option value="pumps" />
+                    <option value="pcs" />
+                    <option value="units" />
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700">
+                    Initial Stock
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={quickAddForm.quantity_on_hand}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, quantity_on_hand: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-xs font-medium text-stone-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700">
+                    Unit Cost (₱)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={quickAddForm.unit_cost}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, unit_cost: e.target.value })}
+                    placeholder="0.00"
+                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-xs font-medium text-stone-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700">
+                    Reorder Alert Level
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={quickAddForm.reorder_level}
+                    onChange={(e) => setQuickAddForm({ ...quickAddForm, reorder_level: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-xs font-medium text-stone-900 focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-end gap-2 border-t border-stone-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickAddOpen(false)}
+                  className="rounded-xl border border-stone-300 px-4 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingQuickAdd || !quickAddForm.item_name.trim()}
+                  className="rounded-xl bg-amber-800 px-4 py-2 text-xs font-bold text-white hover:bg-amber-900 disabled:opacity-50 transition"
+                >
+                  {isSubmittingQuickAdd ? "Saving..." : "Save & Link to Recipe"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

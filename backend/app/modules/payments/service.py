@@ -67,7 +67,7 @@ def validate_cash_tender(amount_due: Decimal, amount_tendered: Decimal | None) -
         tendered_val = amount_tendered if amount_tendered is not None else Decimal("0.00")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Amount tendered (${tendered_val:.2f}) must be at least total due (${amount_due:.2f}).",
+            detail=f"Amount tendered (₱{tendered_val:.2f}) must be at least total due (₱{amount_due:.2f}).",
         )
     change_due = amount_tendered - amount_due
     return amount_tendered, change_due

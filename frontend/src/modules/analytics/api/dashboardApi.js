@@ -14,3 +14,10 @@ export async function fetchInventoryDashboard() {
   const response = await apiClient.get("/dashboard/inventory");
   return response.data;
 }
+
+export async function fetchStoreReports(period = "today") {
+  const response = await apiClient.get("/dashboard/reports", {
+    params: { period },
+  });
+  return response.data;
+}

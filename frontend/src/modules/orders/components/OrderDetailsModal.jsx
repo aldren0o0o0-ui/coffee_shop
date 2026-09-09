@@ -201,7 +201,7 @@ export default function OrderDetailsModal({
                             + {a.addon_name}{" "}
                             {Number(a.unit_price) > 0 && (
                               <span className="text-stone-400">
-                                (${Number(a.unit_price).toFixed(2)})
+                                (₱{Number(a.unit_price).toFixed(2)})
                               </span>
                             )}
                           </div>
@@ -217,7 +217,7 @@ export default function OrderDetailsModal({
                   </div>
 
                   <span className="font-extrabold text-stone-900">
-                    ${Number(item.subtotal).toFixed(2)}
+                    ₱{Number(item.subtotal).toFixed(2)}
                   </span>
                 </div>
               ))}
@@ -228,35 +228,35 @@ export default function OrderDetailsModal({
           <div className="rounded-2xl border border-stone-200 bg-stone-50/50 p-4 space-y-1.5 text-xs">
             <div className="flex justify-between text-stone-600">
               <span>Subtotal</span>
-              <span>${Number(order.subtotal || 0).toFixed(2)}</span>
+              <span>₱{Number(order.subtotal || 0).toFixed(2)}</span>
             </div>
             {Number(order.tax_amount) > 0 && (
               <div className="flex justify-between text-stone-600">
                 <span>Tax</span>
-                <span>${Number(order.tax_amount).toFixed(2)}</span>
+                <span>₱{Number(order.tax_amount).toFixed(2)}</span>
               </div>
             )}
             {Number(order.discount_amount) > 0 && (
               <div className="flex justify-between text-emerald-700 font-bold">
                 <span>Discount</span>
-                <span>-${Number(order.discount_amount).toFixed(2)}</span>
+                <span>-₱{Number(order.discount_amount).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-stone-200 pt-2 text-sm font-black text-stone-950">
               <span>Total Due</span>
-              <span>${Number(order.total_amount || 0).toFixed(2)}</span>
+              <span>₱{Number(order.total_amount || 0).toFixed(2)}</span>
             </div>
 
             {order.amount_tendered && (
               <div className="flex justify-between text-stone-600 pt-1">
                 <span>Cash Tendered:</span>
-                <span>${Number(order.amount_tendered).toFixed(2)}</span>
+                <span>₱{Number(order.amount_tendered).toFixed(2)}</span>
               </div>
             )}
             {order.change_due !== null && order.change_due !== undefined && (
               <div className="flex justify-between font-black text-emerald-800">
                 <span>Change Given:</span>
-                <span>${Number(order.change_due).toFixed(2)}</span>
+                <span>₱{Number(order.change_due).toFixed(2)}</span>
               </div>
             )}
           </div>

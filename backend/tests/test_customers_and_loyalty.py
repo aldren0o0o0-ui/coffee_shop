@@ -316,7 +316,7 @@ def test_customer_routes_integration(db_session):
     # Redeem loyalty via API
     redeem_resp = client.post(
         f"/api/v1/customers/{customer_id}/loyalty/redeem",
-        json={"points": 50, "description": "Redeem $0.50"},
+        json={"points": 50, "description": "Redeem ₱0.50"},
         cookies=cookies,
     )
     assert redeem_resp.status_code == 200

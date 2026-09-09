@@ -2,14 +2,18 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.modules.inventory.models import (
     InventoryItem,
     InventoryTransaction,
     InventoryTransactionType,
 )
-from app.modules.inventory.schemas import InventoryOption
+from app.modules.inventory.schemas import (
+    InventoryItemCreate,
+    InventoryItemUpdate,
+    InventoryOption,
+)
 from app.modules.menu.models import MenuItemIngredient
 
 
@@ -217,4 +221,130 @@ def receive_stock(
         notes=notes,
         now=now,
     )
+
+
+def create_inventory_item(
+    database: Session,
+    payload: InventoryItemCreate,
+    created_by_user_id: int,
+) -> InventoryItem:
+    """
+    Registers a new inventory item and optional initial transaction.
+    """
+    item = InventoryItem(
+        item_name=payload.item_name.strip(),
+        unit_of_measure=payload.unit_of_measure.strip(),
+        quantity_on_hand=payload.quantity_on_hand,
+        reorder_level=payload.reorder_level,
+        unit_cost=payload.unit_cost,
+        is_active=payload.is_active,
+    )
+    database.add(item)
+    database.flush()
+
+    if payload.quantity_on_hand > Decimal("0"):
+        tx = InventoryTransaction(
+            inventory_item_id=item.inventory_item_id,
+            transaction_type=InventoryTransactionType.ADJUSTMENT,
+            quantity_change=payload.quantity_on_hand,
+            reference_type="initial_stock",
+            reference_id=item.inventory_item_id,
+            notes="Initial stock upon creation",
+            created_by=created_by_user_id,
+            transaction_date=datetime.now(timezone.utc),
+        )
+        database.add(tx)
+
+    database.commit()
+    database.refresh(item)
+    return item
+
+
+def update_inventory_item(
+    database: Session,
+    item_id: int,
+    payload: InventoryItemUpdate,
+) -> InventoryItem:
+    """
+    Updates item details, thresholds, and unit costs.
+    """
+    item = database.get(InventoryItem, item_id)
+    if not item:
+        raise ValueError(f"InventoryItem with ID {item_id} not found")
+
+    if payload.item_name is not None:
+        item.item_name = payload.item_name.strip()
+    if payload.unit_of_measure is not None:
+        item.unit_of_measure = payload.unit_of_measure.strip()
+    if payload.reorder_level is not None:
+        item.reorder_level = payload.reorder_level
+    if payload.unit_cost is not None:
+        item.unit_cost = payload.unit_cost
+    if payload.is_active is not None:
+        item.is_active = payload.is_active
+
+    database.commit()
+    database.refresh(item)
+    return item
+
+
+def adjust_inventory_stock(
+    database: Session,
+    item_id: int,
+    quantity_change: Decimal,
+    transaction_type: InventoryTransactionType,
+    created_by_user_id: int,
+    notes: str | None = None,
+) -> tuple[InventoryItem, InventoryTransaction]:
+    """
+    Manually adjusts stock (restock, adjustment, waste, spoilage).
+    """
+    if quantity_change == Decimal("0"):
+        raise ValueError("Adjustment quantity cannot be zero.")
+
+    item = database.get(InventoryItem, item_id)
+    if not item:
+        raise ValueError(f"InventoryItem with ID {item_id} not found")
+
+    new_quantity = item.quantity_on_hand + quantity_change
+    if new_quantity < Decimal("0"):
+        raise ValueError(f"Adjustment would result in negative stock ({new_quantity} {item.unit_of_measure}). Current: {item.quantity_on_hand}")
+
+    item.quantity_on_hand = new_quantity
+    tx = InventoryTransaction(
+        inventory_item_id=item_id,
+        transaction_type=transaction_type,
+        quantity_change=quantity_change,
+        reference_type="manual_adjustment",
+        notes=notes,
+        created_by=created_by_user_id,
+        transaction_date=datetime.now(timezone.utc),
+    )
+    database.add(tx)
+    database.commit()
+    database.refresh(item)
+    database.refresh(tx)
+    return item, tx
+
+
+def list_inventory_transactions(
+    database: Session,
+    limit: int = 50,
+    item_id: int | None = None,
+) -> list[InventoryTransaction]:
+    """
+    Retrieves recent inventory transactions with item and creator details.
+    """
+    stmt = (
+        select(InventoryTransaction)
+        .options(
+            selectinload(InventoryTransaction.inventory_item),
+            selectinload(InventoryTransaction.creator),
+        )
+        .order_by(InventoryTransaction.transaction_date.desc())
+        .limit(limit)
+    )
+    if item_id is not None:
+        stmt = stmt.where(InventoryTransaction.inventory_item_id == item_id)
+    return list(database.scalars(stmt).all())
 

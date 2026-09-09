@@ -194,7 +194,7 @@ export default function CustomerTrackingPage() {
                   {trackingResult.items.map((it) => (
                     <div className="flex justify-between" key={it.order_item_id}>
                       <span>{it.quantity}x {it.item_name} {it.size_name ? `(${it.size_name})` : ""}</span>
-                      <span className="font-semibold">${Number(it.subtotal).toFixed(2)}</span>
+                      <span className="font-semibold">₱{Number(it.subtotal).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

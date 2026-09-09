@@ -12,73 +12,109 @@ import Menu from './modules/menu/pages/MenuManagementPage';
 import CustomerOrderPage from './modules/orders/pages/CustomerOrderPage';
 import CustomerTrackingPage from './modules/orders/pages/CustomerTrackingPage';
 import CustomerBrowsePage from './modules/menu/pages/CustomerBrowsePage';
+import LandingPage from './pages/LandingPage';
 
 import PosPage from './modules/orders/pages/PosPage';
 import OrdersPage from './modules/orders/pages/OrdersPage';
 import DrinkPreparationPage from './modules/orders/pages/DrinkPreparationPage';
-
-import PlaceholderPage from './pages/PlaceholderPage';
+import InventoryPage from './modules/inventory/pages/InventoryPage';
+import PurchasingPage from './modules/procurement/pages/PurchasingPage';
+import ReportsPage from './modules/analytics/pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
 
 function LoginRoute() {
   const { 
     isAuthenticated, isCheckingSession
   } = useAuth();
 
-  if(isCheckingSession) {
-    return(
-      <main className='flex min-h-screen items-center justify-center bg-stone-100'>
-        <p className='text-stone-600'>
-          Checking your session...
+  if (isCheckingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-stone-100">
+        <p className="text-sm text-stone-600">
+          Checking your session…
         </p>
       </main>
     );
   }
 
-  if(isAuthenticated) {
-    return <Navigate replace to="/" />
+  if (isAuthenticated) {
+    return <Navigate replace to="/overview" />
   }
 
   return <AuthForm />;
-
 }
-
 
 function App() {
   return (
     <Routes>
+      {/* Public Landing Page for Viewers */}
+      <Route element={<LandingPage />} path="/" />
+
       {/* Public Customer Browsing, Ordering & Tracking */}
-      <Route element={<CustomerBrowsePage />} path='/browse' />
-      <Route element={<CustomerOrderPage />} path='/order' />
-      <Route element={<CustomerTrackingPage />} path='/track' />
+      <Route element={<CustomerBrowsePage />} path="/browse" />
+      <Route element={<CustomerOrderPage />} path="/order" />
+      <Route element={<CustomerTrackingPage />} path="/track" />
 
-      <Route 
-        element={<LoginRoute />}
-        path='/login' />
+      {/* Staff Authentication */}
+      <Route element={<LoginRoute />} path="/login" />
       
-      <Route element={<ProtectedRoute />} >
+      {/* Staff Workspace Routes */}
+      <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route element={<Dashboard />} index />
+          <Route element={<Dashboard />} path="overview" />
+          <Route element={<Dashboard />} path="dashboard" />
 
-          <Route element={<PosPage />} path='pos' />
-          <Route element={<OrdersPage />} path='orders' />
-          <Route element={<DrinkPreparationPage />} path='preparation' />
-          <Route element={<Menu />} path='menu' />
-          <Route element={<PlaceholderPage description="Review ingredients and stock level" title="Stock" />} path='inventory' />
-          <Route element={<PlaceholderPage description="Request and receive shop supplies." title="Purchasing" />} path='purchasing' />
-          <Route element={<PlaceholderPage description="review shop performance and activity" title="Reports" />} path='reports' />
-
-          <Route element={<PlaceholderPage description="Manage shop and preferences" title="Settings" />} path='settings' />
-
-          <Route element={<RoleRoute allowedRoles={["owner"]} />} >
-            <Route element={<Team />} path='team' />
+          {/* POS: Owner, Manager, Cashier */}
+          <Route element={<RoleRoute allowedRoles={["owner", "manager", "cashier"]} />}>
+            <Route element={<PosPage />} path="pos" />
           </Route>
 
+          {/* Orders: Owner, Manager, Cashier, Barista */}
+          <Route element={<RoleRoute allowedRoles={["owner", "manager", "cashier", "barista"]} />}>
+            <Route element={<OrdersPage />} path="orders" />
+          </Route>
+
+          {/* Drink Preparation: Owner, Manager, Barista */}
+          <Route element={<RoleRoute allowedRoles={["owner", "manager", "barista"]} />}>
+            <Route element={<DrinkPreparationPage />} path="preparation" />
+          </Route>
+
+          {/* Menu Catalog: Owner, Manager */}
+          <Route element={<RoleRoute allowedRoles={["owner", "manager"]} />}>
+            <Route element={<Menu />} path="menu" />
+          </Route>
+
+          {/* Stock / Inventory: Owner, Manager, Inventory Staff */}
+          <Route element={<RoleRoute allowedRoles={["owner", "manager", "inventory staff", "inventory_staff"]} />}>
+            <Route element={<InventoryPage />} path="inventory" />
+          </Route>
+
+          {/* Purchasing & Procurement: Owner, Manager, Inventory Staff */}
+          <Route element={<RoleRoute allowedRoles={["owner", "manager", "inventory staff", "inventory_staff"]} />}>
+            <Route element={<PurchasingPage />} path="purchasing" />
+          </Route>
+
+          {/* Reports & Analytics: Owner, Manager */}
+          <Route element={<RoleRoute allowedRoles={["owner", "manager"]} />}>
+            <Route element={<ReportsPage />} path="reports" />
+          </Route>
+
+          {/* Team Accounts: Owner only */}
+          <Route element={<RoleRoute allowedRoles={["owner"]} />}>
+            <Route element={<Team />} path="team" />
+          </Route>
+
+          {/* Store Settings: Owner only */}
+          <Route element={<RoleRoute allowedRoles={["owner"]} />}>
+            <Route element={<SettingsPage />} path="settings" />
+          </Route>
         </Route>
       </Route>
 
-      <Route element={<Navigate replace to="/" />} path='*' />
+      {/* Catch-all fallback */}
+      <Route element={<Navigate replace to="/" />} path="*" />
     </Routes>
-  )
+  );
 }
 
-export default App
+export default App;

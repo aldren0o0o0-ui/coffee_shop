@@ -1,7 +1,7 @@
 const navigationItems = [
   {
     label: "Overview",
-    path: "/",
+    path: "/overview",
     roles: [
       "owner",
       "manager",
@@ -36,7 +36,7 @@ const navigationItems = [
     roles: ["owner", "manager"],
   },
   {
-    label: "Stock",
+    label: "Stock & Ingredients",
     path: "/inventory",
     roles: [
       "owner",
@@ -73,12 +73,12 @@ const navigationItems = [
 
 export function getNavigationForUser(user) {
   const userRoles = new Set(
-    user.roles.map((role) =>
-      role.role_name.toLowerCase(),
-    ),
+    (user?.roles || []).map((role) =>
+      role.role_name.toLowerCase().replace(/_/g, " ").trim()
+    )
   );
 
   return navigationItems.filter((item) =>
-    item.roles.some((role) => userRoles.has(role)),
+    item.roles.some((role) => userRoles.has(role.toLowerCase().replace(/_/g, " ").trim()))
   );
 }

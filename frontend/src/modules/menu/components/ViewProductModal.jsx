@@ -121,7 +121,7 @@ export default function ViewProductModal({
                 Starting Price
               </span>
               <span className="text-2xl font-extrabold text-amber-950">
-                ${Number(product.base_price).toFixed(2)}
+                ₱{Number(product.base_price).toFixed(2)}
               </span>
             </div>
           </div>
@@ -152,7 +152,7 @@ export default function ViewProductModal({
                     </div>
                     <p className="mt-1 text-xs text-stone-500">
                       {Number(size.price_adjustment) > 0
-                        ? `+$${Number(size.price_adjustment).toFixed(2)}`
+                        ? `+₱${Number(size.price_adjustment).toFixed(2)}`
                         : "Base price"}
                     </p>
                   </div>
@@ -177,7 +177,7 @@ export default function ViewProductModal({
                   >
                     {a.addon_name}{" "}
                     <strong className="text-amber-900">
-                      (+${Number(a.additional_price).toFixed(2)})
+                      (+₱{Number(a.additional_price).toFixed(2)})
                     </strong>
                   </span>
                 ))}

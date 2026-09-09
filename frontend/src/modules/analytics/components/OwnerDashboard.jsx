@@ -31,7 +31,7 @@ export default function OwnerDashboard({ onOpenPasswordModal }) {
   const kpis = [
     {
       title: "Today's Revenue",
-      value: stats ? `$${Number(stats.today_revenue).toFixed(2)}` : "$0.00",
+      value: stats ? `₱${Number(stats.today_revenue).toFixed(2)}` : "₱0.00",
       change: "Live settled sales",
       isPositive: true,
       icon: (
@@ -286,7 +286,7 @@ export default function OwnerDashboard({ onOpenPasswordModal }) {
                   </div>
 
                   <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
-                    <span className="font-bold text-stone-900 text-sm">${Number(order.total_amount).toFixed(2)}</span>
+                    <span className="font-bold text-stone-900 text-sm">₱{Number(order.total_amount).toFixed(2)}</span>
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                       order.order_status === "completed"
                         ? "bg-emerald-100 text-emerald-800"

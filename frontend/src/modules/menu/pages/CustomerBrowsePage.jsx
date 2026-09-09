@@ -8,6 +8,8 @@ export default function CustomerBrowsePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [sortBy, setSortBy] = useState("featured"); // featured | price-asc | price-desc | name
+  const [inStockOnly, setInStockOnly] = useState(false);
   const [activeItemModal, setActiveItemModal] = useState(null);
 
   // Selected item modal customization state
@@ -45,10 +47,11 @@ export default function CustomerBrowsePage() {
     return ["all", ...catalog.map((c) => c.category_name)];
   }, [catalog]);
 
-  // Filtered items based on search and category
+  // Filtered and sorted items
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return allItems.filter((item) => {
+
+    let items = allItems.filter((item) => {
       const matchesCategory =
         selectedCategory === "all" ||
         item.category_name.toLowerCase() === selectedCategory.toLowerCase();
@@ -59,13 +62,26 @@ export default function CustomerBrowsePage() {
         (item.description && item.description.toLowerCase().includes(query)) ||
         (item.ingredients && item.ingredients.some((ing) => ing.toLowerCase().includes(query)));
 
-      return matchesCategory && matchesSearch;
+      const matchesStock = !inStockOnly || item.is_available;
+
+      return matchesCategory && matchesSearch && matchesStock;
     });
-  }, [allItems, selectedCategory, searchQuery]);
+
+    // Apply sorting
+    if (sortBy === "price-asc") {
+      items.sort((a, b) => Number(a.base_price) - Number(b.base_price));
+    } else if (sortBy === "price-desc") {
+      items.sort((a, b) => Number(b.base_price) - Number(a.base_price));
+    } else if (sortBy === "name") {
+      items.sort((a, b) => a.item_name.localeCompare(b.item_name));
+    }
+
+    return items;
+  }, [allItems, selectedCategory, searchQuery, inStockOnly, sortBy]);
 
   function openItemModal(item) {
     setActiveItemModal(item);
-    setModalSelectedSize(item.sizes.length > 0 ? item.sizes[0] : null);
+    setModalSelectedSize(item.sizes && item.sizes.length > 0 ? item.sizes[0] : null);
     setModalSelectedAddons([]);
   }
 
@@ -95,85 +111,54 @@ export default function CustomerBrowsePage() {
   }, [activeItemModal, modalSelectedSize, modalSelectedAddons]);
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] font-sans text-stone-900 selection:bg-amber-200">
-      {/* Top Notice Bar */}
-      <div className="bg-amber-950 px-4 py-2 text-center text-xs font-semibold text-amber-200">
-        <span>☕ Freshly roasted beans daily • Online ordering with zero pickup wait</span>
-      </div>
+    <div className="min-h-screen bg-[#140e08] font-sans text-[#f5e6d3] antialiased selection:bg-[#c8860a] selection:text-[#140e08]">
+      {/* Top Bar Header */}
+      <header className="sticky top-0 z-30 border-b border-[#c8860a]/20 bg-[#140e08]/95 px-4 backdrop-blur-md sm:px-8">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4">
+          {/* Top Left Corner: Clean Navigation & Brand */}
+          <div className="flex items-center gap-3">
+            <Link
+              to="/"
+              className="flex items-center gap-1.5 rounded-full border border-[#c8860a]/30 bg-[#2a1c0d] px-3 py-1.5 text-xs font-semibold text-[#e6a832] transition hover:bg-[#342210] hover:border-[#c8860a]"
+              title="Return to Home"
+            >
+              <span>←</span>
+              <span className="hidden sm:inline">Home</span>
+            </Link>
 
-      {/* Main Navigation Header */}
-      <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-stone-200/80 bg-white/95 px-6 backdrop-blur-md sm:px-12">
-        <Link className="flex items-center gap-3" to="/">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-900 text-xl text-white shadow-xs">
-            ☕
+            <Link className="flex items-center gap-2" to="/">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#c8860a]/40 bg-[#2a1c0d] text-base text-[#e6a832]">
+                ☕
+              </span>
+              <span className="font-serif text-base font-bold tracking-tight text-[#e6a832] hidden sm:inline">
+                LDRN&apos;s Coffee
+              </span>
+            </Link>
           </div>
-          <div>
-            <p className="text-lg font-black tracking-tight text-amber-950">ldrn&apos;s coffee</p>
-            <p className="text-[10px] font-semibold tracking-wider text-amber-800 uppercase">Artisan Roastery & Bar</p>
-          </div>
-        </Link>
 
-        {/* Header Actions */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          <Link
-            className="hidden items-center gap-1.5 text-xs font-bold text-stone-600 transition hover:text-amber-950 sm:flex"
-            to="/track"
-          >
-            <svg className="h-4 w-4 text-stone-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Track Order</span>
-          </Link>
-
-          <Link
-            className="flex items-center gap-2 rounded-2xl bg-amber-900 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-amber-950 active:scale-95"
-            to="/order"
-          >
-            <svg className="h-4 w-4 text-amber-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Order & Checkout</span>
-          </Link>
-
-          <Link
-            className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-700 transition hover:bg-stone-100"
-            to="/login"
-          >
-            Staff
-          </Link>
-        </div>
-      </header>
-
-      {/* Hero Welcome & Search Banner */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-amber-50/70 via-[#FDFBF7] to-[#FDFBF7] px-6 py-12 text-center sm:px-12 sm:py-16">
-        <div className="mx-auto max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-100/60 px-4 py-1 text-xs font-bold text-amber-900 uppercase tracking-wider">
-            <span>✨</span> Live Menu & Roastery Catalog
-          </span>
-          <h1 className="mt-4 text-4xl font-black tracking-tight text-amber-950 sm:text-5xl lg:text-6xl">
-            Taste the Handcrafted Difference.
-          </h1>
-          <p className="mt-4 text-base text-stone-600 sm:text-lg leading-relaxed">
-            Browse our signature espresso beverages, specialty cold brews, non-coffee favorites, and artisanal pastries — freshly prepared to your exact customization.
-          </p>
-
-          {/* Interactive Search Bar */}
-          <div className="mx-auto mt-8 max-w-xl">
+          {/* Center Search Bar */}
+          <div className="flex-1 max-w-md mx-2 sm:mx-4">
             <div className="relative flex items-center">
-              <svg className="absolute left-4 h-5 w-5 text-stone-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg
+                className="absolute left-3.5 h-4 w-4 text-[#c8860a]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
                 <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <input
                 aria-label="Search menu"
-                className="w-full rounded-2xl border border-stone-300 bg-white py-3.5 pl-12 pr-4 text-sm text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 focus:border-amber-700 focus:ring-4 focus:ring-amber-100"
+                className="w-full rounded-full border border-[#c8860a]/30 bg-[#1e1509] py-2 pl-10 pr-9 text-xs sm:text-sm text-[#f5e6d3] outline-none transition placeholder:text-[#b8a08a]/50 focus:border-[#c8860a] focus:ring-2 focus:ring-[#c8860a]/20"
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search coffee, tea, latte, ingredients, flavors…"
+                placeholder="Search coffee, drinks, flavors…"
                 type="text"
                 value={searchQuery}
               />
               {searchQuery && (
                 <button
-                  className="absolute right-3 rounded-lg p-1 text-xs text-stone-400 hover:text-stone-700"
+                  className="absolute right-3 rounded-full p-0.5 text-xs text-[#b8a08a] hover:text-[#f5e6d3]"
                   onClick={() => setSearchQuery("")}
                   type="button"
                 >
@@ -182,68 +167,124 @@ export default function CustomerBrowsePage() {
               )}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Category Navigation Pills */}
-      <section className="sticky top-20 z-20 border-y border-stone-200/80 bg-white/90 px-6 py-3.5 backdrop-blur-md sm:px-12">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 overflow-x-auto">
-          <div className="flex items-center gap-2">
-            {categoryNames.map((catName) => {
-              const isActive = selectedCategory.toLowerCase() === catName.toLowerCase();
-              return (
-                <button
-                  className={`rounded-2xl px-4 py-2 text-xs font-bold transition whitespace-nowrap ${
-                    isActive
-                      ? "bg-amber-900 text-white shadow-xs"
-                      : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-                  }`}
-                  key={catName}
-                  onClick={() => setSelectedCategory(catName)}
-                  type="button"
-                >
-                  {catName === "all" ? "☕ All Offerings" : catName}
-                </button>
-              );
-            })}
+          {/* Right Header Actions */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              className="flex items-center gap-1.5 rounded-full bg-[#c8860a] px-4 py-2 text-xs font-bold text-[#140e08] shadow-md transition hover:bg-[#e6a832] active:scale-95"
+              to="/order"
+            >
+              <span>Order Now</span>
+              <span>→</span>
+            </Link>
+
+            <Link
+              className="hidden sm:inline-flex rounded-full border border-stone-700 bg-stone-900/80 px-3 py-1.5 text-xs font-medium text-[#b8a08a] hover:text-white"
+              to="/login"
+            >
+              Staff
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Browsing Control Strip: Left Title + Sorting & Filters */}
+      <section className="border-b border-[#c8860a]/15 bg-[#1a1107] px-4 py-3 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+          {/* Top-Left Title with adjusted font size */}
+          <div className="flex items-baseline gap-2.5">
+            <h1 className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-white">
+              Browse Menu
+            </h1>
+            <span className="rounded-full border border-[#c8860a]/30 bg-[#c8860a]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#e6a832]">
+              {filteredItems.length} {filteredItems.length === 1 ? "item" : "items"}
+            </span>
           </div>
 
-          <span className="hidden text-xs font-semibold text-stone-500 sm:inline">
-            Showing {filteredItems.length} {filteredItems.length === 1 ? "item" : "items"}
-          </span>
+          {/* Quick Filters & Sorting Controls */}
+          <div className="flex items-center gap-2 text-xs">
+            {/* Stock Filter Toggle */}
+            <button
+              onClick={() => setInStockOnly((prev) => !prev)}
+              type="button"
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition border ${
+                inStockOnly
+                  ? "border-emerald-600/60 bg-emerald-950/40 text-emerald-400"
+                  : "border-[#c8860a]/20 bg-[#2a1c0d] text-[#b8a08a] hover:border-[#c8860a]/40"
+              }`}
+            >
+              {inStockOnly ? "✓ In Stock" : "In Stock Only"}
+            </button>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-1.5 rounded-full border border-[#c8860a]/20 bg-[#2a1c0d] px-3 py-1 text-xs text-[#b8a08a]">
+              <span>Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-transparent text-[#e6a832] font-semibold outline-none cursor-pointer"
+              >
+                <option value="featured" className="bg-[#1e1509] text-[#f5e6d3]">Featured</option>
+                <option value="price-asc" className="bg-[#1e1509] text-[#f5e6d3]">Price: Low to High</option>
+                <option value="price-desc" className="bg-[#1e1509] text-[#f5e6d3]">Price: High to Low</option>
+                <option value="name" className="bg-[#1e1509] text-[#f5e6d3]">Name (A-Z)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Navigation Pills */}
+        <div className="mx-auto mt-3 flex max-w-7xl items-center gap-2 overflow-x-auto pb-1">
+          {categoryNames.map((catName) => {
+            const isActive = selectedCategory.toLowerCase() === catName.toLowerCase();
+            return (
+              <button
+                className={`rounded-full px-4 py-1 text-xs font-bold transition whitespace-nowrap ${
+                  isActive
+                    ? "bg-[#c8860a] text-[#140e08] shadow-[0_2px_10px_rgba(200,134,10,0.3)]"
+                    : "border border-[#c8860a]/20 bg-[#2a1c0d] text-[#b8a08a] hover:border-[#c8860a]/50 hover:text-white"
+                }`}
+                key={catName}
+                onClick={() => setSelectedCategory(catName)}
+                type="button"
+              >
+                {catName === "all" ? "☕ All Offerings" : catName}
+              </button>
+            );
+          })}
         </div>
       </section>
 
       {/* Product Catalog Grid */}
-      <main className="mx-auto max-w-7xl px-6 py-12 sm:px-12">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
         {isLoading ? (
-          <div className="py-24 text-center">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-stone-200 border-t-amber-900" />
-            <p className="mt-4 text-sm font-semibold text-stone-600">Loading fresh menu from database…</p>
+          <div className="py-20 text-center">
+            <div className="mx-auto h-9 w-9 animate-spin rounded-full border-4 border-[#c8860a]/20 border-t-[#c8860a]" />
+            <p className="mt-3 text-xs font-semibold text-[#b8a08a]">Loading catalog from roastery…</p>
           </div>
         ) : filteredItems.length > 0 ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {filteredItems.map((item) => (
               <article
-                className="group relative flex flex-col justify-between rounded-3xl border border-stone-200 bg-white p-6 shadow-xs transition duration-200 hover:-translate-y-1 hover:border-amber-400 hover:shadow-lg"
+                className="group relative flex flex-col justify-between rounded-2xl border border-[#c8860a]/20 bg-[#24170d] p-5 shadow-lg transition duration-200 hover:-translate-y-1 hover:border-[#c8860a]/50 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
                 key={item.menu_item_id}
               >
                 <div>
                   {/* Card Hero Image */}
-                  <div className="relative -mx-6 -mt-6 mb-4 aspect-video overflow-hidden rounded-t-3xl bg-stone-100 border-b border-stone-100">
+                  <div className="relative -mx-5 -mt-5 mb-3.5 aspect-[16/10] overflow-hidden rounded-t-2xl bg-[#140e08] border-b border-[#c8860a]/15">
                     {item.image_url ? (
                       <img
                         src={getImageUrl(item.image_url)}
                         alt={item.item_name}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center bg-amber-900/5 text-amber-900/40">
+                      <div className="flex h-full w-full flex-col items-center justify-center bg-[#1e1509] text-[#c8860a]/30">
                         <span className="text-3xl">☕</span>
                       </div>
                     )}
                     {item.images && item.images.length > 1 && (
-                      <span className="absolute bottom-2 right-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
+                      <span className="absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-bold text-[#e6a832] backdrop-blur-xs">
                         📷 {item.images.length} photos
                       </span>
                     )}
@@ -252,41 +293,47 @@ export default function CustomerBrowsePage() {
                   {/* Item Header */}
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-amber-900 uppercase">
+                      <span className="rounded-full border border-[#c8860a]/30 bg-[#c8860a]/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#e6a832] uppercase">
                         {item.category_name}
                       </span>
-                      <h3 className="mt-2 text-xl font-bold text-stone-900 group-hover:text-amber-950">
+                      <h3 className="mt-1.5 font-serif text-lg font-bold text-white group-hover:text-[#e6a832] transition">
                         {item.item_name}
                       </h3>
                     </div>
-                    <span className="text-xl font-black text-amber-900">
-                      ${Number(item.base_price).toFixed(2)}
+                    <span className="font-serif text-lg font-bold text-[#e6a832] flex-shrink-0">
+                      ₱{Number(item.base_price).toFixed(2)}
                     </span>
                   </div>
 
                   {/* Description */}
-                  <p className="mt-2.5 text-xs leading-relaxed text-stone-600">
+                  <p className="mt-2 text-xs leading-relaxed text-[#b8a08a] line-clamp-2">
                     {item.description || "Handcrafted fresh to order with precision brewing standards."}
                   </p>
 
-                  {/* Size & Addon summary pills */}
-                  {item.sizes.length > 0 && (
-                    <div className="mt-4 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-stone-400">Sizes:</span>
+                  {/* Size Options Pills */}
+                  {item.sizes && item.sizes.length > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-[#b8a08a]">Sizes:</span>
                       {item.sizes.map((s) => (
-                        <span className="rounded-lg bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-700" key={s.menu_item_size_id}>
-                          {s.size_name} {Number(s.price_adjustment) > 0 ? `(+$${Number(s.price_adjustment).toFixed(2)})` : ""}
+                        <span
+                          className="rounded-md border border-[#c8860a]/20 bg-[#1e1509] px-2 py-0.5 text-[10px] font-medium text-[#f5e6d3]"
+                          key={s.menu_item_size_id}
+                        >
+                          {s.size_name} {Number(s.price_adjustment) > 0 ? `(+₱${Number(s.price_adjustment).toFixed(2)})` : ""}
                         </span>
                       ))}
                     </div>
                   )}
 
                   {/* Ingredients Tags */}
-                  {item.ingredients.length > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-1">
-                      <span className="text-[11px] font-bold text-stone-400">Made with:</span>
+                  {item.ingredients && item.ingredients.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1">
+                      <span className="text-[10px] font-bold text-[#b8a08a]">Notes:</span>
                       {item.ingredients.map((ing, i) => (
-                        <span className="rounded-md bg-amber-50/80 px-1.5 py-0.5 text-[10px] font-medium text-amber-800" key={i}>
+                        <span
+                          className="rounded-md bg-[#c8860a]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#e6a832]"
+                          key={i}
+                        >
                           {ing}
                         </span>
                       ))}
@@ -295,20 +342,20 @@ export default function CustomerBrowsePage() {
                 </div>
 
                 {/* Card Action Buttons */}
-                <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4">
+                <div className="mt-5 flex items-center justify-between border-t border-[#c8860a]/15 pt-3.5">
                   <button
-                    className="text-xs font-bold text-stone-600 underline transition hover:text-amber-900"
+                    className="text-xs font-bold text-[#e6a832] underline transition hover:text-[#f4c265]"
                     onClick={() => openItemModal(item)}
                     type="button"
                   >
-                    View Details & Recipe →
+                    Details &amp; Recipe →
                   </button>
 
                   <Link
-                    className="flex items-center gap-1 rounded-xl bg-amber-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-950 active:scale-95 shadow-xs"
+                    className="flex items-center gap-1 rounded-full bg-[#c8860a] px-3.5 py-1.5 text-xs font-bold text-[#140e08] shadow-sm transition hover:bg-[#e6a832] active:scale-95"
                     to="/order"
                   >
-                    <span>Order Now</span>
+                    <span>Order</span>
                     <span>→</span>
                   </Link>
                 </div>
@@ -316,15 +363,18 @@ export default function CustomerBrowsePage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl border border-stone-200 bg-white p-12 text-center shadow-xs">
-            <span className="text-4xl">☕</span>
-            <h3 className="mt-3 text-lg font-bold text-stone-900">No matching drinks found</h3>
-            <p className="mt-1 text-xs text-stone-500">Try changing your search keywords or switching category filters.</p>
+          <div className="rounded-2xl border border-[#c8860a]/20 bg-[#24170d] p-10 text-center shadow-lg">
+            <span className="text-3xl">☕</span>
+            <h3 className="mt-2.5 font-serif text-base font-bold text-white">No matching drinks found</h3>
+            <p className="mt-1 text-xs text-[#b8a08a]">
+              Try changing your search keywords or switching filters.
+            </p>
             <button
-              className="mt-4 rounded-xl bg-amber-900 px-4 py-2 text-xs font-bold text-white"
+              className="mt-3.5 rounded-full bg-[#c8860a] px-4 py-1.5 text-xs font-bold text-[#140e08] transition hover:bg-[#e6a832]"
               onClick={() => {
                 setSearchQuery("");
                 setSelectedCategory("all");
+                setInStockOnly(false);
               }}
               type="button"
             >
@@ -336,11 +386,11 @@ export default function CustomerBrowsePage() {
 
       {/* Item Details & Customization Preview Modal */}
       {activeItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-stone-950/70 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-stone-200 bg-white p-6 shadow-2xl sm:p-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-[#c8860a]/30 bg-[#24170d] p-6 shadow-2xl text-[#f5e6d3]">
             <button
               aria-label="Close dialog"
-              className="absolute right-5 top-5 z-10 rounded-full bg-white/80 p-2 text-stone-400 backdrop-blur-xs hover:bg-stone-100 hover:text-stone-700"
+              className="absolute right-4 top-4 z-10 rounded-full bg-[#140e08]/80 p-1.5 text-[#b8a08a] backdrop-blur-xs hover:bg-[#140e08] hover:text-white"
               onClick={() => setActiveItemModal(null)}
               type="button"
             >
@@ -349,7 +399,7 @@ export default function CustomerBrowsePage() {
 
             {/* Modal Hero Image */}
             {activeItemModal.image_url && (
-              <div className="relative -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 mb-5 aspect-video overflow-hidden rounded-t-3xl bg-stone-100 border-b border-stone-100">
+              <div className="relative -mx-6 -mt-6 mb-4 aspect-video overflow-hidden rounded-t-3xl bg-[#140e08] border-b border-[#c8860a]/20">
                 <img
                   src={getImageUrl(activeItemModal.image_url)}
                   alt={activeItemModal.item_name}
@@ -359,40 +409,40 @@ export default function CustomerBrowsePage() {
             )}
 
             <div>
-              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold tracking-wider text-amber-900 uppercase">
+              <span className="rounded-full border border-[#c8860a]/30 bg-[#c8860a]/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-[#e6a832] uppercase">
                 {activeItemModal.category_name}
               </span>
-              <h2 className="mt-2 text-2xl font-black text-stone-900 sm:text-3xl">
+              <h2 className="mt-1.5 font-serif text-2xl font-bold text-white">
                 {activeItemModal.item_name}
               </h2>
-              <p className="mt-2 text-sm leading-relaxed text-stone-600">
+              <p className="mt-1.5 text-xs leading-relaxed text-[#b8a08a]">
                 {activeItemModal.description || "Handcrafted fresh to order using artisan roasted beans."}
               </p>
             </div>
 
             {/* Size Options */}
-            {activeItemModal.sizes.length > 0 && (
-              <div className="mt-6 border-t border-stone-100 pt-4">
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
+            {activeItemModal.sizes && activeItemModal.sizes.length > 0 && (
+              <div className="mt-4 border-t border-[#c8860a]/15 pt-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#e6a832]">
                   Select Size
                 </label>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
                   {activeItemModal.sizes.map((size) => {
                     const isSelected = modalSelectedSize?.menu_item_size_id === size.menu_item_size_id;
                     return (
                       <button
-                        className={`flex items-center justify-between rounded-2xl border p-3 text-xs font-bold transition ${
+                        className={`flex items-center justify-between rounded-xl border p-2.5 text-xs font-bold transition ${
                           isSelected
-                            ? "border-amber-900 bg-amber-50 text-amber-950 ring-2 ring-amber-700/20"
-                            : "border-stone-200 bg-stone-50 text-stone-700 hover:bg-white"
+                            ? "border-[#c8860a] bg-[#c8860a]/20 text-white ring-2 ring-[#c8860a]/30"
+                            : "border-[#c8860a]/20 bg-[#1e1509] text-[#b8a08a] hover:border-[#c8860a]/50 hover:text-white"
                         }`}
                         key={size.menu_item_size_id}
                         onClick={() => setModalSelectedSize(size)}
                         type="button"
                       >
                         <span>{size.size_name}</span>
-                        <span className="text-stone-500">
-                          {Number(size.price_adjustment) > 0 ? `+$${Number(size.price_adjustment).toFixed(2)}` : "Standard"}
+                        <span className="text-[#e6a832]">
+                          {Number(size.price_adjustment) > 0 ? `+₱${Number(size.price_adjustment).toFixed(2)}` : "Standard"}
                         </span>
                       </button>
                     );
@@ -402,35 +452,35 @@ export default function CustomerBrowsePage() {
             )}
 
             {/* Add-ons Customization */}
-            {activeItemModal.addons.length > 0 && (
-              <div className="mt-4 border-t border-stone-100 pt-4">
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                  Custom Add-ons & Flavors
+            {activeItemModal.addons && activeItemModal.addons.length > 0 && (
+              <div className="mt-3 border-t border-[#c8860a]/15 pt-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#e6a832]">
+                  Custom Add-ons &amp; Flavors
                 </label>
-                <div className="mt-2 space-y-1.5">
+                <div className="mt-1.5 space-y-1">
                   {activeItemModal.addons.map((addon) => {
                     const isChecked = modalSelectedAddons.some(
                       (a) => a.menu_item_addon_id === addon.menu_item_addon_id
                     );
                     return (
                       <button
-                        className={`flex w-full items-center justify-between rounded-xl border p-2.5 text-xs transition ${
+                        className={`flex w-full items-center justify-between rounded-xl border p-2 text-xs transition ${
                           isChecked
-                            ? "border-amber-900 bg-amber-50/70 font-bold text-amber-950"
-                            : "border-stone-200 bg-stone-50 text-stone-700 hover:bg-white"
+                            ? "border-[#c8860a] bg-[#c8860a]/20 font-bold text-white"
+                            : "border-[#c8860a]/20 bg-[#1e1509] text-[#b8a08a] hover:border-[#c8860a]/50 hover:text-white"
                         }`}
                         key={addon.menu_item_addon_id}
                         onClick={() => toggleAddon(addon)}
                         type="button"
                       >
                         <div className="flex items-center gap-2">
-                          <span className={`flex h-4 w-4 items-center justify-center rounded-md border text-[10px] ${isChecked ? "bg-amber-900 text-white border-amber-900" : "border-stone-300"}`}>
+                          <span className={`flex h-4 w-4 items-center justify-center rounded-md border text-[10px] ${isChecked ? "bg-[#c8860a] text-[#140e08] border-[#c8860a]" : "border-[#c8860a]/30"}`}>
                             {isChecked ? "✓" : ""}
                           </span>
                           <span>{addon.addon_name}</span>
                         </div>
-                        <span className="font-semibold text-stone-500">
-                          +${Number(addon.additional_price).toFixed(2)}
+                        <span className="font-semibold text-[#e6a832]">
+                          +₱{Number(addon.additional_price).toFixed(2)}
                         </span>
                       </button>
                     );
@@ -440,22 +490,22 @@ export default function CustomerBrowsePage() {
             )}
 
             {/* Ingredients List */}
-            {activeItemModal.ingredients.length > 0 && (
-              <div className="mt-4 rounded-2xl bg-stone-50 p-3 text-xs text-stone-600">
-                <p className="font-bold text-stone-800">Fresh Ingredients:</p>
-                <p className="mt-1 text-[11px] text-stone-500">{activeItemModal.ingredients.join(" • ")}</p>
+            {activeItemModal.ingredients && activeItemModal.ingredients.length > 0 && (
+              <div className="mt-3 rounded-xl border border-[#c8860a]/20 bg-[#1e1509] p-2.5 text-xs text-[#b8a08a]">
+                <p className="font-bold text-white text-[11px]">Fresh Ingredients:</p>
+                <p className="mt-0.5 text-[10px] text-[#e6a832]">{activeItemModal.ingredients.join(" • ")}</p>
               </div>
             )}
 
             {/* Modal Footer Price & Checkout Trigger */}
-            <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4">
+            <div className="mt-5 flex items-center justify-between border-t border-[#c8860a]/15 pt-3.5">
               <div>
-                <span className="text-xs text-stone-500">Calculated Price:</span>
-                <p className="text-2xl font-black text-amber-950">${modalTotalPrice.toFixed(2)}</p>
+                <span className="text-[10px] text-[#b8a08a]">Calculated Price:</span>
+                <p className="font-serif text-xl font-bold text-[#e6a832]">₱{modalTotalPrice.toFixed(2)}</p>
               </div>
 
               <button
-                className="flex items-center gap-2 rounded-2xl bg-amber-900 px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-amber-950"
+                className="flex items-center gap-2 rounded-full bg-[#c8860a] px-5 py-2.5 text-xs font-bold text-[#140e08] shadow-md transition hover:bg-[#e6a832]"
                 onClick={() => {
                   setActiveItemModal(null);
                   navigate("/order");
@@ -470,16 +520,17 @@ export default function CustomerBrowsePage() {
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-stone-200 bg-white px-6 py-12 text-center text-xs text-stone-500 sm:px-12">
-        <p className="font-bold text-stone-700">ldrn&apos;s Coffee Shop Management System</p>
-        <p className="mt-1">Real-time menu data synchronized with PostgreSQL database.</p>
-        <div className="mt-4 flex justify-center gap-4 text-amber-900 font-semibold">
-          <Link to="/order">Online Ordering</Link>
+      {/* Compact Clean Footer */}
+      <footer className="border-t border-[#c8860a]/20 bg-[#140e08] px-4 py-8 text-center text-xs text-[#b8a08a] sm:px-8">
+        <p className="font-serif font-bold text-white">LDRN&apos;s Coffee Roastery &amp; Bar</p>
+        <div className="mt-2 flex justify-center gap-4 text-[#e6a832] font-semibold">
+          <Link to="/" className="hover:underline">Home</Link>
           <span>•</span>
-          <Link to="/track">Order Tracking</Link>
+          <Link to="/order" className="hover:underline">Order Online</Link>
           <span>•</span>
-          <Link to="/login">Staff Portal</Link>
+          <Link to="/track" className="hover:underline">Track Order</Link>
+          <span>•</span>
+          <Link to="/login" className="hover:underline">Staff Portal</Link>
         </div>
       </footer>
     </div>

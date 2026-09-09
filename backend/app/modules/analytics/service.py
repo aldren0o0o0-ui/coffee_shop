@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -22,6 +22,7 @@ from app.modules.orders.models import (
     OrderItemAddon,
     OrderStatus,
 )
+from app.modules.payments.models import Payment, PaymentStatus
 from app.modules.procurement.models import (
     PurchaseRequest,
     PurchaseRequestStatus,
@@ -32,14 +33,19 @@ from app.modules.analytics.schemas import (
     BaristaTicket,
     BaristaTicketItem,
     CashierDashboardStats,
+    ChannelSales,
     CombinedDashboardResponse,
     InventoryStaffDashboardStats,
     InventoryTransactionInfo,
     LowStockItemInfo,
     ManagerDashboardStats,
     OwnerDashboardStats,
+    PaymentMethodSales,
     RecentOrderInfo,
     ShiftTeamMember,
+    StoreReportResponse,
+    TimelinePoint,
+    TopSellingItem,
 )
 
 
@@ -530,4 +536,181 @@ def get_combined_dashboard_overview(database: Session, user: User) -> CombinedDa
         cashier_stats=cashier_stats,
         barista_stats=barista_stats,
         inventory_stats=inventory_stats,
+    )
+
+
+def generate_store_reports(database: Session, period: str = "today") -> StoreReportResponse:
+    """
+    Generates consolidated reporting analytics for Manager and Owner roles.
+    """
+    now = utc_now()
+    if period == "today":
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "this_week":
+        start_date = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "this_month":
+        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif period == "all_time":
+        start_date = None
+    else:
+        period = "today"
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    valid_statuses = [
+        OrderStatus.CONFIRMED,
+        OrderStatus.PREPARING,
+        OrderStatus.READY,
+        OrderStatus.COMPLETED,
+    ]
+
+    order_filter = [Order.order_status.in_(valid_statuses)]
+    if start_date:
+        order_filter.append(Order.order_date >= start_date)
+
+    # 1. Total revenue
+    rev_stmt = select(func.coalesce(func.sum(Order.total_amount), Decimal("0.00"))).where(*order_filter)
+    total_revenue = database.scalar(rev_stmt) or Decimal("0.00")
+
+    # 2. Total orders & completed orders
+    count_filter = []
+    if start_date:
+        count_filter.append(Order.order_date >= start_date)
+    total_orders_stmt = select(func.count(Order.order_id)).where(*count_filter)
+    total_orders_count = database.scalar(total_orders_stmt) or 0
+
+    completed_orders_stmt = select(func.count(Order.order_id)).where(
+        Order.order_status == OrderStatus.COMPLETED,
+        *count_filter,
+    )
+    completed_orders_count = database.scalar(completed_orders_stmt) or 0
+
+    aov = (
+        round(total_revenue / Decimal(completed_orders_count), 2)
+        if completed_orders_count > 0
+        else Decimal("0.00")
+    )
+
+    # 3. Top selling items
+    top_items_stmt = (
+        select(
+            OrderItem.menu_item_id,
+            MenuItem.item_name,
+            func.sum(OrderItem.quantity).label("qty_sold"),
+            func.sum(OrderItem.subtotal).label("total_item_sales"),
+        )
+        .join(MenuItem, OrderItem.menu_item_id == MenuItem.menu_item_id)
+        .join(Order, OrderItem.order_id == Order.order_id)
+        .where(*order_filter)
+        .group_by(OrderItem.menu_item_id, MenuItem.item_name)
+        .order_by(func.sum(OrderItem.quantity).desc())
+        .limit(5)
+    )
+    top_items_rows = database.execute(top_items_stmt).all()
+    top_selling_items = [
+        TopSellingItem(
+            menu_item_id=row.menu_item_id,
+            item_name=row.item_name,
+            quantity_sold=int(row.qty_sold or 0),
+            total_sales=Decimal(str(row.total_item_sales or "0.00")),
+        )
+        for row in top_items_rows
+    ]
+
+    # 4. Sales by Channel
+    channel_stmt = (
+        select(
+            Order.order_channel,
+            func.count(Order.order_id).label("channel_count"),
+            func.coalesce(func.sum(Order.total_amount), Decimal("0.00")).label("channel_revenue"),
+        )
+        .where(*order_filter)
+        .group_by(Order.order_channel)
+    )
+    channel_rows = database.execute(channel_stmt).all()
+    sales_by_channel = [
+        ChannelSales(
+            channel="In-Store POS" if str(row.order_channel.value if hasattr(row.order_channel, "value") else row.order_channel) == "pos" else "Online Web Order",
+            order_count=int(row.channel_count or 0),
+            total_sales=Decimal(str(row.channel_revenue or "0.00")),
+        )
+        for row in channel_rows
+    ]
+
+    # 5. Sales by Payment Method
+    pm_filter = [Payment.payment_status == PaymentStatus.COMPLETED]
+    if start_date:
+        pm_filter.append(Payment.created_at >= start_date)
+    pm_stmt = (
+        select(
+            Payment.payment_method,
+            func.count(Payment.payment_id).label("pm_count"),
+            func.coalesce(func.sum(Payment.amount_paid), Decimal("0.00")).label("pm_total"),
+        )
+        .where(*pm_filter)
+        .group_by(Payment.payment_method)
+    )
+    pm_rows = database.execute(pm_stmt).all()
+    sales_by_payment_method = [
+        PaymentMethodSales(
+            payment_method=str(row.payment_method.value if hasattr(row.payment_method, "value") else row.payment_method).replace("_", " ").title(),
+            transaction_count=int(row.pm_count or 0),
+            total_amount=Decimal(str(row.pm_total or "0.00")),
+        )
+        for row in pm_rows
+    ]
+
+    # 6. Timeline
+    timeline = []
+    if period == "today":
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        for hour in range(6, 24, 3):
+            t_start = day_start + timedelta(hours=hour)
+            t_end = t_start + timedelta(hours=3)
+            slot_stmt = select(
+                func.coalesce(func.sum(Order.total_amount), Decimal("0.00")),
+                func.count(Order.order_id),
+            ).where(
+                Order.order_status.in_(valid_statuses),
+                Order.order_date >= t_start,
+                Order.order_date < t_end,
+            )
+            slot_rev, slot_cnt = database.execute(slot_stmt).one()
+            timeline.append(
+                TimelinePoint(
+                    label=f"{hour:02d}:00",
+                    sales=slot_rev or Decimal("0.00"),
+                    orders_count=slot_cnt or 0,
+                )
+            )
+    else:
+        for i in range(6, -1, -1):
+            day_cursor = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+            next_day = day_cursor + timedelta(days=1)
+            slot_stmt = select(
+                func.coalesce(func.sum(Order.total_amount), Decimal("0.00")),
+                func.count(Order.order_id),
+            ).where(
+                Order.order_status.in_(valid_statuses),
+                Order.order_date >= day_cursor,
+                Order.order_date < next_day,
+            )
+            slot_rev, slot_cnt = database.execute(slot_stmt).one()
+            timeline.append(
+                TimelinePoint(
+                    label=day_cursor.strftime("%a %d"),
+                    sales=slot_rev or Decimal("0.00"),
+                    orders_count=slot_cnt or 0,
+                )
+            )
+
+    return StoreReportResponse(
+        period=period,
+        total_revenue=total_revenue,
+        total_orders_count=total_orders_count,
+        completed_orders_count=completed_orders_count,
+        average_order_value=aov,
+        top_selling_items=top_selling_items,
+        sales_by_channel=sales_by_channel,
+        sales_by_payment_method=sales_by_payment_method,
+        timeline=timeline,
     )

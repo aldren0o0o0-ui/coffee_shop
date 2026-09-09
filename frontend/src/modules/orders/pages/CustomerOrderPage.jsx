@@ -205,7 +205,7 @@ export default function CustomerOrderPage() {
             Track Order 🔍
           </Link>
           <Link className="rounded-xl bg-stone-900 px-4 py-2 text-white hover:bg-stone-800" to="/login">
-            Staff Workspace →
+            Staff Portal →
           </Link>
         </div>
       </header>
@@ -263,7 +263,7 @@ export default function CustomerOrderPage() {
 
                 <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
                   <span className="font-bold text-stone-500">
-                    Estimated Total Due at Counter: <strong className="text-stone-900">${Number(confirmedOrder.total_amount).toFixed(2)}</strong>
+                    Estimated Total Due at Counter: <strong className="text-stone-900">₱{Number(confirmedOrder.total_amount).toFixed(2)}</strong>
                   </span>
                   <div className="flex items-center gap-2">
                     <Link
@@ -419,7 +419,7 @@ export default function CustomerOrderPage() {
                             <div className="flex items-start justify-between gap-1">
                               <h4 className="font-bold text-stone-900 text-sm">{item.item_name}</h4>
                               <span className="font-black text-amber-950 text-xs shrink-0">
-                                ${Number(item.base_price).toFixed(2)}
+                                ₱{Number(item.base_price).toFixed(2)}
                               </span>
                             </div>
                             <p className="mt-0.5 text-xs text-stone-500 line-clamp-2">
@@ -539,15 +539,15 @@ export default function CustomerOrderPage() {
               <div className="space-y-1 text-xs border-b border-stone-100 pb-3">
                 <div className="flex justify-between text-stone-600">
                   <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>₱{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-stone-600">
                   <span>Estimated Tax (8%)</span>
-                  <span>${tax.toFixed(2)}</span>
+                  <span>₱{tax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-base font-black text-stone-950 pt-1">
                   <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>₱{total.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -690,8 +690,8 @@ export default function CustomerOrderPage() {
                   {isSubmitting
                     ? "Securing Order..."
                     : paymentMethodIntent === "pay_at_counter"
-                    ? `Reserve & Pay at Counter ($${total.toFixed(2)}) 🏪`
-                    : `Pay $${total.toFixed(2)} & Confirm Order 💳`}
+                    ? `Reserve & Pay at Counter (₱${total.toFixed(2)}) 🏪`
+                    : `Pay ₱${total.toFixed(2)} & Confirm Order 💳`}
                 </button>
               </form>
             </div>
@@ -707,7 +707,7 @@ export default function CustomerOrderPage() {
               <div>
                 <h3 className="text-base font-black text-stone-900">{customizingItem.item_name}</h3>
                 <span className="text-xs text-amber-950 font-bold">
-                  Base Price: ${Number(customizingItem.base_price).toFixed(2)}
+                  Base Price: ₱{Number(customizingItem.base_price).toFixed(2)}
                 </span>
               </div>
               <button
@@ -739,7 +739,7 @@ export default function CustomerOrderPage() {
                       <span>{s.size_name}</span>
                       <span>
                         {Number(s.price_adjustment) > 0
-                          ? `+$${Number(s.price_adjustment).toFixed(2)}`
+                          ? `+₱${Number(s.price_adjustment).toFixed(2)}`
                           : "Base"}
                       </span>
                     </button>
@@ -780,7 +780,7 @@ export default function CustomerOrderPage() {
                           />
                           <span>{a.addon_name}</span>
                         </div>
-                        <span className="text-amber-900">+${Number(a.additional_price).toFixed(2)}</span>
+                        <span className="text-amber-900">+₱{Number(a.additional_price).toFixed(2)}</span>
                       </label>
                     );
                   })}

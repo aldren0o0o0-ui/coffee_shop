@@ -703,6 +703,7 @@ export default function MenuManagementPage() {
         categories={catalog}
         inventoryOptions={inventoryOptions}
         onProductUpdated={handleProductUpdated}
+        onInventoryItemCreated={(newItem) => setInventoryOptions((prev) => [...prev, newItem])}
       />
 
       {/* PERMANENT DELETE CONFIRMATION DIALOG */}
@@ -822,6 +823,7 @@ export default function MenuManagementPage() {
         categories={catalog}
         inventoryOptions={inventoryOptions}
         onProductPublished={handleProductPublished}
+        onInventoryItemCreated={(newItem) => setInventoryOptions((prev) => [...prev, newItem])}
       />
     </div>
   );

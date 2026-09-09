@@ -1,8 +1,8 @@
 export function formatCurrency(amount) {
   const numeric = Number(amount) || 0;
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-PH", {
     style: "currency",
-    currency: "USD",
+    currency: "PHP",
   }).format(numeric);
 }
 

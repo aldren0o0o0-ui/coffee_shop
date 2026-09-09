@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/useAuth";
 
@@ -76,7 +76,7 @@ function AuthForm() {
       setForm(INITIAL_FORM);
 
       const destination =
-        location.state?.from?.pathname ?? "/";
+        location.state?.from?.pathname ?? "/overview";
 
       navigate(destination, {
         replace: true,
@@ -110,56 +110,65 @@ function AuthForm() {
   }
 
   return (
-    <main className="min-h-screen bg-stone-100 px-4 py-8">
-      <section className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl overflow-hidden rounded-3xl bg-white shadow-xl">
+    <main className="min-h-screen bg-stone-100 px-4 py-8 flex items-center justify-center font-sans">
+      <section className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-xl">
+        {/* Left Branding Panel */}
         <div className="hidden w-1/2 bg-amber-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-300">
-              ldrn's coffee
-            </p>
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.25em] text-amber-300">
+              <span>☕</span>
+              <span>LDRN&apos;s Coffee</span>
+            </div>
 
-            <h1 className="mt-6 max-w-md text-5xl font-bold leading-tight">
+            <h1 className="mt-8 max-w-md text-4xl font-bold leading-tight sm:text-5xl">
               Run your coffee shop with clarity.
             </h1>
 
-            <p className="mt-6 max-w-md text-lg text-amber-100">
-              Manage orders, products, inventory, and daily operations from one
-              workspace.
+            <p className="mt-6 max-w-md text-base leading-relaxed text-amber-100">
+              Manage orders, menu catalog, inventory, and daily store operations from one workspace.
             </p>
           </div>
 
-          <p className="text-sm text-amber-200">
-            Coffee Shop Management System
-          </p>
+          <div className="flex items-center justify-between text-xs text-amber-200">
+            <span>Coffee Shop Management System</span>
+            <Link to="/" className="font-semibold text-amber-300 hover:underline">
+              ← View Storefront
+            </Link>
+          </div>
         </div>
 
-        <div className="flex w-full items-center justify-center p-6 sm:p-12 lg:w-1/2">
+        {/* Right Form Panel */}
+        <div className="flex w-full items-center justify-center p-8 sm:p-12 lg:w-1/2 bg-white">
           <div className="w-full max-w-md">
-            <div className="mb-8 lg:hidden">
-              <p className="font-semibold uppercase tracking-[0.25em] text-amber-900">
-                BrewFlow
-              </p>
+            <div className="mb-6 flex items-center justify-between lg:hidden">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-900">
+                <span>☕</span>
+                <span>LDRN&apos;s Coffee</span>
+              </div>
+              <Link to="/" className="text-xs font-semibold text-amber-900 hover:underline">
+                ← Storefront
+              </Link>
             </div>
 
             <h2 className="text-3xl font-bold text-stone-900">Welcome back</h2>
 
-            <p className="mt-2 text-stone-600">
+            <p className="mt-2 text-xs text-stone-600">
               Sign in using your staff account.
             </p>
 
             {authenticationError && (
               <div
-                className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700"
                 role="alert"
               >
                 {authenticationError}
               </div>
             )}
 
-            <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
+            <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
               <div>
                 <label
-                  className="mb-2 block text-sm font-medium text-stone-800"
+                  className="mb-1.5 block text-xs font-semibold text-stone-800 uppercase tracking-wider"
                   htmlFor="identifier"
                 >
                   Username or email
@@ -171,7 +180,7 @@ function AuthForm() {
                   }
                   aria-invalid={Boolean(errors.identifier)}
                   autoComplete="username"
-                  className="w-full rounded-xl border border-stone-300 px-4 py-3 outline-none transition focus:border-amber-700 focus:ring-4 focus:ring-amber-100"
+                  className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-amber-700 focus:ring-4 focus:ring-amber-100"
                   id="identifier"
                   name="identifier"
                   onChange={handleChange}
@@ -182,7 +191,7 @@ function AuthForm() {
 
                 {errors.identifier && (
                   <p
-                    className="mt-2 text-sm text-red-600"
+                    className="mt-1.5 text-xs text-red-600"
                     id="identifier-error"
                     role="alert"
                   >
@@ -193,7 +202,7 @@ function AuthForm() {
 
               <div>
                 <label
-                  className="mb-2 block text-sm font-medium text-stone-800"
+                  className="mb-1.5 block text-xs font-semibold text-stone-800 uppercase tracking-wider"
                   htmlFor="password"
                 >
                   Password
@@ -206,7 +215,7 @@ function AuthForm() {
                     }
                     aria-invalid={Boolean(errors.password)}
                     autoComplete="current-password"
-                    className="w-full rounded-xl border border-stone-300 px-4 py-3 pr-20 outline-none transition focus:border-amber-700 focus:ring-4 focus:ring-amber-100"
+                    className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 pr-20 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-amber-700 focus:ring-4 focus:ring-amber-100"
                     id="password"
                     name="password"
                     onChange={handleChange}
@@ -216,7 +225,7 @@ function AuthForm() {
                   />
 
                   <button
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-amber-800 hover:text-amber-950"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-amber-800 hover:text-amber-950"
                     onClick={() => setShowPassword((current) => !current)}
                     type="button"
                   >
@@ -226,7 +235,7 @@ function AuthForm() {
 
                 {errors.password && (
                   <p
-                    className="mt-2 text-sm text-red-600"
+                    className="mt-1.5 text-xs text-red-600"
                     id="password-error"
                     role="alert"
                   >
@@ -236,15 +245,15 @@ function AuthForm() {
               </div>
 
               <button
-                className="w-full rounded-xl bg-amber-900 px-4 py-3 font-semibold text-white transition hover:bg-amber-950 focus:outline-none focus:ring-4 focus:ring-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-xl bg-amber-900 px-4 py-3 text-xs font-bold text-white uppercase tracking-wider transition hover:bg-amber-950 focus:outline-none focus:ring-4 focus:ring-amber-200 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
                 disabled={isSubmitting}
                 type="submit"
               >
-                {isSubmitting ? "Signing in..." : "Sign in"}
+                {isSubmitting ? "Signing in..." : "Sign in to Workspace"}
               </button>
             </form>
 
-            <p className="mt-8 text-center text-sm text-stone-500">
+            <p className="mt-8 text-center text-xs text-stone-500">
               Contact an administrator if you cannot access your account.
             </p>
           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  Link,
   Outlet,
   useLocation,
   useNavigate,
@@ -9,20 +10,20 @@ import { useAuth } from "../modules/auth/context/useAuth";
 import Sidebar from "../components/Sidebar";
 import ChangePasswordModal from "../modules/auth/components/ChangePasswordModal";
 
-
 const pageTitles = {
+  "/overview": "Overview",
+  "/dashboard": "Overview",
   "/": "Overview",
-  "/pos": "Point of sale",
+  "/pos": "Point of Sale",
   "/orders": "Orders",
-  "/preparation": "Drink preparation",
-  "/menu": "Menu",
-  "/inventory": "Stock",
-  "/purchasing": "Purchasing",
-  "/reports": "Reports",
-  "/team": "Team",
-  "/settings": "Settings",
+  "/preparation": "Drink Preparation",
+  "/menu": "Menu Management",
+  "/inventory": "Stock Management",
+  "/purchasing": "Purchasing & Procurement",
+  "/reports": "Store Analytics & Reports",
+  "/team": "Team Accounts",
+  "/settings": "Store Settings",
 };
-
 
 export default function AppLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -54,10 +55,7 @@ export default function AppLayout() {
     window.addEventListener("keydown", closeWithEscape);
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        closeWithEscape,
-      );
+      window.removeEventListener("keydown", closeWithEscape);
     };
   }, [isForcedPasswordChange]);
 
@@ -73,11 +71,10 @@ export default function AppLayout() {
     }
   }
 
-  const pageTitle =
-    pageTitles[location.pathname] ?? "Workspace";
+  const pageTitle = pageTitles[location.pathname] ?? "Workspace";
 
   return (
-    <div className="min-h-screen bg-stone-100">
+    <div className="min-h-screen bg-stone-100 font-sans text-stone-900">
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -92,9 +89,7 @@ export default function AppLayout() {
               aria-expanded={isSidebarOpen}
               aria-label="Open navigation"
               className="rounded-xl border border-stone-200 p-2 text-stone-700 hover:bg-stone-100 lg:hidden"
-              onClick={() =>
-                setIsSidebarOpen(true)
-              }
+              onClick={() => setIsSidebarOpen(true)}
               type="button"
             >
               <span aria-hidden="true">☰</span>
@@ -112,6 +107,16 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* View Public Storefront Link */}
+            <Link
+              to="/"
+              className="hidden items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-xs font-semibold text-stone-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-950 sm:flex"
+              title="View Public Storefront"
+            >
+              <span>Storefront</span>
+              <span>↗</span>
+            </Link>
+
             <button
               aria-label="Change Password"
               className="hidden items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-xs font-semibold text-stone-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-950 sm:flex"
@@ -125,14 +130,12 @@ export default function AppLayout() {
             </button>
 
             <button
-              className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isSigningOut}
               onClick={handleLogout}
               type="button"
             >
-              {isSigningOut
-                ? "Signing out…"
-                : "Sign out"}
+              {isSigningOut ? "Signing out…" : "Sign out"}
             </button>
           </div>
         </header>
@@ -152,4 +155,4 @@ export default function AppLayout() {
       />
     </div>
   );
-}
+}

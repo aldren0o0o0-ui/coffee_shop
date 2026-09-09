@@ -159,7 +159,7 @@ export default function PosPage() {
     if (cart.length === 0) return;
 
     if (paymentMethod === "cash" && numericTendered < total) {
-      setPosError(`Amount tendered ($${numericTendered.toFixed(2)}) must be at least total due ($${total.toFixed(2)}).`);
+      setPosError(`Amount tendered (₱${numericTendered.toFixed(2)}) must be at least total due (₱${total.toFixed(2)}).`);
       return;
     }
 
@@ -240,7 +240,7 @@ export default function PosPage() {
     if (!selectedPendingOrder) return;
 
     if (counterPaymentMethod === "cash" && counterNumericTendered < counterTotal) {
-      setLookupError(`Amount tendered ($${counterNumericTendered.toFixed(2)}) must be at least total due ($${counterTotal.toFixed(2)}).`);
+      setLookupError(`Amount tendered (₱${counterNumericTendered.toFixed(2)}) must be at least total due (₱${counterTotal.toFixed(2)}).`);
       return;
     }
 
@@ -406,7 +406,7 @@ export default function PosPage() {
 
                       <div className="text-right">
                         <span className="text-sm font-black text-stone-900">
-                          ${Number(order.total_amount).toFixed(2)}
+                          ₱{Number(order.total_amount).toFixed(2)}
                         </span>
                         <span className="block text-[10px] font-bold text-amber-800 uppercase mt-0.5">
                           Awaiting Payment
@@ -461,7 +461,7 @@ export default function PosPage() {
                             </div>
                           )}
                         </div>
-                        <span className="font-bold text-stone-900">${Number(item.subtotal).toFixed(2)}</span>
+                        <span className="font-bold text-stone-900">₱{Number(item.subtotal).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -470,15 +470,15 @@ export default function PosPage() {
                   <div className="space-y-1 text-xs border-b border-stone-100 pb-3">
                     <div className="flex justify-between text-stone-600">
                       <span>Subtotal</span>
-                      <span>${Number(selectedPendingOrder.subtotal).toFixed(2)}</span>
+                      <span>₱{Number(selectedPendingOrder.subtotal).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-stone-600">
                       <span>Tax (8%)</span>
-                      <span>${Number(selectedPendingOrder.tax_amount).toFixed(2)}</span>
+                      <span>₱{Number(selectedPendingOrder.tax_amount).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-base font-black text-stone-950 pt-1">
                       <span>Total Due</span>
-                      <span>${counterTotal.toFixed(2)}</span>
+                      <span>₱{counterTotal.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -512,7 +512,7 @@ export default function PosPage() {
                     {counterPaymentMethod === "cash" && (
                       <div className="rounded-2xl bg-stone-50 p-3 space-y-2 border border-stone-200">
                         <div className="flex items-center justify-between text-xs">
-                          <label className="font-bold text-stone-700">Amount Tendered ($):</label>
+                          <label className="font-bold text-stone-700">Amount Tendered (₱):</label>
                           <input
                             type="number"
                             step="0.01"
@@ -535,30 +535,30 @@ export default function PosPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setCounterAmountTendered("20.00")}
-                            className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                          >
-                            $20
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCounterAmountTendered("50.00")}
-                            className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                          >
-                            $50
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => setCounterAmountTendered("100.00")}
                             className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
                           >
-                            $100
+                            ₱100
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCounterAmountTendered("500.00")}
+                            className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
+                          >
+                            ₱500
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCounterAmountTendered("1000.00")}
+                            className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
+                          >
+                            ₱1,000
                           </button>
                         </div>
 
                         <div className="flex justify-between items-center text-xs font-black text-emerald-800 border-t border-stone-200 pt-2">
                           <span>Change Due:</span>
-                          <span className="text-sm">${counterChangeDue.toFixed(2)}</span>
+                          <span className="text-sm">₱{counterChangeDue.toFixed(2)}</span>
                         </div>
                       </div>
                     )}
@@ -568,7 +568,7 @@ export default function PosPage() {
                       disabled={isSubmitting || (counterPaymentMethod === "cash" && counterNumericTendered < counterTotal)}
                       className="w-full rounded-2xl bg-amber-900 py-3.5 text-xs font-black text-white shadow-md hover:bg-amber-950 disabled:opacity-50 transition"
                     >
-                      {isSubmitting ? "Processing..." : `Charge $${counterTotal.toFixed(2)} & Issue Receipt 📄`}
+                      {isSubmitting ? "Processing..." : `Charge ₱${counterTotal.toFixed(2)} & Issue Receipt 📄`}
                     </button>
                   </form>
                 </div>
@@ -683,7 +683,7 @@ export default function PosPage() {
 
                     <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2 text-xs">
                       <span className="font-extrabold text-amber-950">
-                        ${Number(item.base_price).toFixed(2)}
+                        ₱{Number(item.base_price).toFixed(2)}
                       </span>
                       <span className="rounded-lg bg-amber-900 text-white px-2 py-0.5 text-[10px] font-bold">
                         + Add
@@ -784,7 +784,7 @@ export default function PosPage() {
                           </div>
                         )}
                         <div className="text-[11px] font-extrabold text-amber-950">
-                          ${(item.unit_price * item.quantity).toFixed(2)}
+                          ₱{(item.unit_price * item.quantity).toFixed(2)}
                         </div>
                       </div>
 
@@ -818,15 +818,15 @@ export default function PosPage() {
               <div className="space-y-1 text-xs border-b border-stone-100 pb-3">
                 <div className="flex justify-between text-stone-600">
                   <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>₱{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-stone-600">
                   <span>Estimated Tax (8%)</span>
-                  <span>${tax.toFixed(2)}</span>
+                  <span>₱{tax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-base font-black text-stone-950 pt-1">
                   <span>Total Due</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>₱{total.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -860,7 +860,7 @@ export default function PosPage() {
                 {paymentMethod === "cash" && (
                   <div className="rounded-2xl bg-stone-50 p-3 space-y-2 border border-stone-200 text-xs">
                     <div className="flex items-center justify-between">
-                      <label className="font-bold text-stone-700">Amount Tendered ($):</label>
+                      <label className="font-bold text-stone-700">Amount Tendered (₱):</label>
                       <input
                         type="number"
                         step="0.01"
@@ -882,23 +882,30 @@ export default function PosPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setAmountTendered("20.00")}
+                        onClick={() => setAmountTendered("100.00")}
                         className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
                       >
-                        $20
+                        ₱100
                       </button>
                       <button
                         type="button"
-                        onClick={() => setAmountTendered("50.00")}
+                        onClick={() => setAmountTendered("500.00")}
                         className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
                       >
-                        $50
+                        ₱500
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAmountTendered("1000.00")}
+                        className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
+                      >
+                        ₱1,000
                       </button>
                     </div>
 
                     <div className="flex justify-between items-center font-black text-emerald-800 border-t border-stone-200 pt-1.5">
                       <span>Change Due:</span>
-                      <span className="text-sm">${registerChangeDue.toFixed(2)}</span>
+                      <span className="text-sm">₱{registerChangeDue.toFixed(2)}</span>
                     </div>
                   </div>
                 )}
@@ -909,7 +916,7 @@ export default function PosPage() {
                   onClick={handleCheckout}
                   className="w-full rounded-2xl bg-amber-900 py-3.5 text-xs font-black text-white shadow-md hover:bg-amber-950 disabled:opacity-50 transition"
                 >
-                  {isSubmitting ? "Processing Sale..." : `Charge $${total.toFixed(2)} & Complete 📄`}
+                  {isSubmitting ? "Processing Sale..." : `Charge ₱${total.toFixed(2)} & Complete 📄`}
                 </button>
               </div>
             </div>
@@ -925,7 +932,7 @@ export default function PosPage() {
               <div>
                 <h3 className="text-base font-black text-stone-900">{customizingItem.item_name}</h3>
                 <span className="text-xs text-amber-950 font-bold">
-                  Base: ${Number(customizingItem.base_price).toFixed(2)}
+                  Base: ₱{Number(customizingItem.base_price).toFixed(2)}
                 </span>
               </div>
               <button
@@ -957,7 +964,7 @@ export default function PosPage() {
                       <span>{s.size_name}</span>
                       <span>
                         {Number(s.price_adjustment) > 0
-                          ? `+$${Number(s.price_adjustment).toFixed(2)}`
+                          ? `+₱${Number(s.price_adjustment).toFixed(2)}`
                           : "Base"}
                       </span>
                     </button>
@@ -998,7 +1005,7 @@ export default function PosPage() {
                           />
                           <span>{a.addon_name}</span>
                         </div>
-                        <span className="text-amber-900">+${Number(a.additional_price).toFixed(2)}</span>
+                        <span className="text-amber-900">+₱{Number(a.additional_price).toFixed(2)}</span>
                       </label>
                     );
                   })}
@@ -1069,18 +1076,18 @@ export default function PosPage() {
               </div>
               <div className="flex justify-between text-stone-600">
                 <span>Total Paid:</span>
-                <span className="font-extrabold text-stone-900">${Number(confirmedReceipt.total_amount).toFixed(2)}</span>
+                <span className="font-extrabold text-stone-900">₱{Number(confirmedReceipt.total_amount).toFixed(2)}</span>
               </div>
               {confirmedReceipt.amount_tendered && (
                 <div className="flex justify-between text-stone-600">
                   <span>Cash Tendered:</span>
-                  <span>${Number(confirmedReceipt.amount_tendered).toFixed(2)}</span>
+                  <span>₱{Number(confirmedReceipt.amount_tendered).toFixed(2)}</span>
                 </div>
               )}
               {confirmedReceipt.change_due !== null && confirmedReceipt.change_due !== undefined && (
                 <div className="flex justify-between font-black text-emerald-800 border-t border-stone-200 pt-1">
                   <span>Change Given:</span>
-                  <span>${Number(confirmedReceipt.change_due).toFixed(2)}</span>
+                  <span>₱{Number(confirmedReceipt.change_due).toFixed(2)}</span>
                 </div>
               )}
             </div>

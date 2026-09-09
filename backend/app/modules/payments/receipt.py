@@ -150,7 +150,7 @@ def generate_receipt_pdf(order: Order, payment: Payment | None = None) -> str:
         item_rows.append([
             Paragraph(desc, body_style),
             Paragraph(str(item.quantity), body_style),
-            Paragraph(f"${Decimal(item.subtotal):.2f}", body_style),
+            Paragraph(f"₱{Decimal(item.subtotal):.2f}", body_style),
         ])
 
     items_table = Table(item_rows, colWidths=[42 * mm, 12 * mm, 18 * mm])
@@ -166,18 +166,18 @@ def generate_receipt_pdf(order: Order, payment: Payment | None = None) -> str:
 
     # 5. Financial Summary & Tender
     total_data = [
-        [Paragraph("Subtotal:", body_style), Paragraph(f"${Decimal(order.subtotal):.2f}", body_style)],
-        [Paragraph("Tax (8%):", body_style), Paragraph(f"${Decimal(order.tax_amount):.2f}", body_style)],
-        [Paragraph("TOTAL DUE:", body_bold), Paragraph(f"${Decimal(order.total_amount):.2f}", body_bold)],
+        [Paragraph("Subtotal:", body_style), Paragraph(f"₱{Decimal(order.subtotal):.2f}", body_style)],
+        [Paragraph("Tax (8%):", body_style), Paragraph(f"₱{Decimal(order.tax_amount):.2f}", body_style)],
+        [Paragraph("TOTAL DUE:", body_bold), Paragraph(f"₱{Decimal(order.total_amount):.2f}", body_bold)],
     ]
 
     if payment:
         method_str = payment.payment_method.value.upper()
-        total_data.append([Paragraph(f"Payment ({method_str}):", body_style), Paragraph(f"${Decimal(payment.amount_paid):.2f}", body_style)])
+        total_data.append([Paragraph(f"Payment ({method_str}):", body_style), Paragraph(f"₱{Decimal(payment.amount_paid):.2f}", body_style)])
 
         if payment.amount_tendered is not None and payment.change_due is not None:
-            total_data.append([Paragraph("Cash Tendered:", body_style), Paragraph(f"${Decimal(payment.amount_tendered):.2f}", body_style)])
-            total_data.append([Paragraph("Change Given:", body_bold), Paragraph(f"${Decimal(payment.change_due):.2f}", body_bold)])
+            total_data.append([Paragraph("Cash Tendered:", body_style), Paragraph(f"₱{Decimal(payment.amount_tendered):.2f}", body_style)])
+            total_data.append([Paragraph("Change Given:", body_bold), Paragraph(f"₱{Decimal(payment.change_due):.2f}", body_bold)])
 
     totals_table = Table(total_data, colWidths=[42 * mm, 30 * mm])
     totals_table.setStyle(TableStyle([

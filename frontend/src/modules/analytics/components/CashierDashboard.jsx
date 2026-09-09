@@ -86,7 +86,7 @@ export default function CashierDashboard({ onOpenPasswordModal }) {
 
   const cashierStats = [
     { label: "My Orders Taken", value: stats ? `${stats.my_orders_taken_count} orders` : "0", sub: "Today's register tickets", color: "text-amber-900", bg: "bg-amber-50" },
-    { label: "Register Sales", value: stats ? `$${Number(stats.register_sales_total).toFixed(2)}` : "$0.00", sub: "Settled sales", color: "text-emerald-800", bg: "bg-emerald-50" },
+    { label: "Register Sales", value: stats ? `₱${Number(stats.register_sales_total).toFixed(2)}` : "₱0.00", sub: "Settled sales", color: "text-emerald-800", bg: "bg-emerald-50" },
     { label: "Awaiting Payment", value: stats ? `${stats.awaiting_payment_count} orders` : "0", sub: "Held unpaid carts", color: "text-rose-700", bg: "bg-rose-50" },
     { label: "Ready for Pickup", value: stats ? `${stats.ready_for_pickup_count} orders` : "0", sub: "Ready at counter", color: "text-blue-800", bg: "bg-blue-50" },
   ];
@@ -267,7 +267,7 @@ export default function CashierDashboard({ onOpenPasswordModal }) {
                 >
                   {menuCatalog.flatMap((c) => c.items).map((item) => (
                     <option key={item.menu_item_id} value={item.menu_item_id}>
-                      {item.item_name} — ${Number(item.base_price).toFixed(2)}
+                      {item.item_name} — ₱{Number(item.base_price).toFixed(2)}
                     </option>
                   ))}
                 </select>
@@ -275,7 +275,7 @@ export default function CashierDashboard({ onOpenPasswordModal }) {
 
               <div className="flex items-center justify-between rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-900">
                 <span>Total Due:</span>
-                <span className="text-base">${selectedItem ? Number(selectedItem.base_price * 1.08).toFixed(2) : "0.00"}</span>
+                <span className="text-base">₱{selectedItem ? Number(selectedItem.base_price * 1.08).toFixed(2) : "0.00"}</span>
               </div>
 
               <div className="mt-6 flex justify-end gap-2">

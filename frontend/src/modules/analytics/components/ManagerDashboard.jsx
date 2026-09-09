@@ -137,7 +137,7 @@ export default function ManagerDashboard({ onOpenPasswordModal }) {
         <article className="rounded-3xl border border-stone-200 bg-white p-5 shadow-xs">
           <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">Shift Revenue</span>
           <p className="mt-3 text-2xl font-extrabold text-stone-900 sm:text-3xl">
-            {isLoading ? "…" : `$${Number(stats?.shift_revenue || 0).toFixed(2)}`}
+            {isLoading ? "…" : `₱${Number(stats?.shift_revenue || 0).toFixed(2)}`}
           </p>
           <p className="mt-2 text-xs font-medium text-emerald-700">Settled orders today</p>
         </article>
