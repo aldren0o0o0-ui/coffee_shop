@@ -1,17 +1,26 @@
 import { useState } from "react";
 import { updateOrderStatus } from "../api/ordersApi";
+import { payAtCounter } from "../../payments/api/paymentsApi";
+import { downloadReceipt, printReceipt } from "../utils/receiptUtils";
 
 const STATE_COLORS = {
+  awaiting_payment: "bg-amber-100 text-amber-900 border-amber-300",
   AWAITING_PAYMENT: "bg-amber-100 text-amber-900 border-amber-300",
+  confirmed: "bg-blue-100 text-blue-900 border-blue-300",
   CONFIRMED: "bg-blue-100 text-blue-900 border-blue-300",
+  preparing: "bg-indigo-100 text-indigo-900 border-indigo-300",
   PREPARING: "bg-indigo-100 text-indigo-900 border-indigo-300",
+  ready: "bg-emerald-100 text-emerald-900 border-emerald-300",
   READY: "bg-emerald-100 text-emerald-900 border-emerald-300",
+  completed: "bg-stone-100 text-stone-800 border-stone-300",
   COMPLETED: "bg-stone-100 text-stone-800 border-stone-300",
+  cancelled: "bg-rose-100 text-rose-900 border-rose-300",
   CANCELLED: "bg-rose-100 text-rose-900 border-rose-300",
+  expired: "bg-stone-200 text-stone-600 border-stone-300",
   EXPIRED: "bg-stone-200 text-stone-600 border-stone-300",
 };
 
-const TIMELINE_STEPS = ["CONFIRMED", "PREPARING", "READY", "COMPLETED"];
+const TIMELINE_STEPS = ["confirmed", "preparing", "ready", "completed"];
 
 export default function OrderDetailsModal({
   isOpen,
@@ -30,13 +39,13 @@ export default function OrderDetailsModal({
   const isCashier = roles.includes("cashier");
   const isManagerOrOwner = roles.includes("manager") || roles.includes("owner");
 
-  const status = order.order_status;
+  const status = (order.order_status || "").toLowerCase();
 
   async function handleStatusAdvance(nextStatus) {
     setIsUpdating(true);
     setUpdateError("");
     try {
-      const updated = await updateOrderStatus(order.order_id, nextStatus);
+      const updated = await updateOrderStatus(order.order_id, nextStatus.toLowerCase());
       if (onOrderUpdated) {
         onOrderUpdated(updated);
       }
@@ -49,10 +58,30 @@ export default function OrderDetailsModal({
   }
 
   // Determine permitted actions based on role and current state
-  const canStartPrep = (isBarista || isManagerOrOwner) && status === "CONFIRMED";
-  const canMarkReady = (isBarista || isManagerOrOwner) && status === "PREPARING";
-  const canMarkCompleted = (isCashier || isManagerOrOwner) && status === "READY";
-  const canCancel = (isCashier || isManagerOrOwner || isBarista) && ["AWAITING_PAYMENT", "CONFIRMED", "PREPARING"].includes(status);
+  const canConfirmCounterPayment = (isCashier || isManagerOrOwner) && status === "awaiting_payment";
+  const canStartPrep = (isBarista || isManagerOrOwner) && status === "confirmed";
+  const canMarkReady = (isBarista || isManagerOrOwner) && status === "preparing";
+  const canMarkCompleted = (isCashier || isManagerOrOwner) && status === "ready";
+  const canCancel = (isCashier || isManagerOrOwner || isBarista) && ["awaiting_payment", "confirmed", "preparing"].includes(status);
+
+  async function handleConfirmCounterPayment() {
+    setIsUpdating(true);
+    setUpdateError("");
+    try {
+      const updated = await payAtCounter(order.order_id, {
+        paymentMethod: "cash",
+        amountTendered: Number(order.total_amount),
+      });
+      if (onOrderUpdated) {
+        onOrderUpdated(updated);
+      }
+      onClose();
+    } catch (err) {
+      setUpdateError(err.response?.data?.detail || "Failed to process payment at counter.");
+    } finally {
+      setIsUpdating(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-stone-950/70 p-3 backdrop-blur-xs sm:p-4 animate-in fade-in duration-150">
@@ -99,7 +128,7 @@ export default function OrderDetailsModal({
           )}
 
           {/* STATE MACHINE TIMELINE */}
-          {!["CANCELLED", "EXPIRED"].includes(status) && (
+          {!["cancelled", "expired"].includes(status) && (
             <div className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-stone-400 block mb-3">
                 Order Progression Timeline
@@ -123,7 +152,7 @@ export default function OrderDetailsModal({
                       >
                         {isPassed && !isCurrent ? "✓" : idx + 1}
                       </div>
-                      <span className={`mt-1.5 text-[10px] font-bold ${isCurrent ? "text-amber-950 font-extrabold" : isPassed ? "text-stone-700" : "text-stone-400"}`}>
+                      <span className={`mt-1.5 text-[10px] font-bold uppercase ${isCurrent ? "text-amber-950 font-extrabold" : isPassed ? "text-stone-700" : "text-stone-400"}`}>
                         {step}
                       </span>
                     </div>
@@ -134,18 +163,18 @@ export default function OrderDetailsModal({
           )}
 
           {/* REFERENCE CODE BANNER FOR PENDING COUNTER ORDERS */}
-          {order.reference_code && order.order_status === "AWAITING_PAYMENT" && (
-            <div className="flex items-center justify-between rounded-2xl border border-amber-300 bg-amber-50/80 p-4">
+          {(order.reference_code || status === "awaiting_payment") && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4">
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block">
                   Pay at Counter Reference Code
                 </span>
                 <span className="text-2xl font-black tracking-widest text-amber-950">
-                  {order.reference_code}
+                  {order.reference_code || `REF-${order.order_id}`}
                 </span>
               </div>
-              <div className="text-right">
-                <span className="rounded-full bg-amber-200/80 px-2.5 py-1 text-[10px] font-bold text-amber-900">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-amber-200 px-2.5 py-1 text-[10px] font-black text-amber-950">
                   Awaiting In-Store Payment
                 </span>
               </div>
@@ -261,18 +290,29 @@ export default function OrderDetailsModal({
             )}
           </div>
 
-          {/* RECEIPT PDF LINK */}
+          {/* RECEIPT PDF ACTIONS */}
           {order.receipt_pdf_url && (
-            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3 flex items-center justify-between text-xs">
-              <span className="font-bold text-stone-700">Official Customer Receipt</span>
-              <a
-                href={order.receipt_pdf_url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 rounded-xl bg-stone-900 px-3.5 py-1.5 font-bold text-white hover:bg-stone-800 transition"
-              >
-                <span>📄 View PDF</span>
-              </a>
+            <div className="rounded-2xl border border-stone-200 bg-stone-50 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+              <div>
+                <span className="font-bold text-stone-800 block">Official Customer Receipt</span>
+                <span className="text-[10px] text-stone-500">80mm standard thermal receipt</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => printReceipt(order.receipt_pdf_url)}
+                  className="flex items-center gap-1 rounded-xl border border-stone-300 bg-white px-3 py-1.5 font-bold text-stone-800 hover:bg-stone-100 transition shadow-xs"
+                >
+                  <span>🖨️ Print</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadReceipt(order.receipt_pdf_url, order.order_id)}
+                  className="flex items-center gap-1 rounded-xl bg-amber-900 px-3.5 py-1.5 font-bold text-white hover:bg-amber-950 transition shadow-xs"
+                >
+                  <span>⬇️ Download PDF</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -296,6 +336,18 @@ export default function OrderDetailsModal({
                 className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-800 hover:bg-rose-100 disabled:opacity-50 transition"
               >
                 Cancel Order
+              </button>
+            )}
+
+            {canConfirmCounterPayment && (
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={handleConfirmCounterPayment}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-800 disabled:opacity-50 transition"
+              >
+                <span>💵</span>
+                <span>{isUpdating ? "Processing..." : `Confirm Payment (₱${Number(order.total_amount).toFixed(2)})`}</span>
               </button>
             )}
 

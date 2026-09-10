@@ -67,6 +67,7 @@ function App() {
           {/* POS: Owner, Manager, Cashier */}
           <Route element={<RoleRoute allowedRoles={["owner", "manager", "cashier"]} />}>
             <Route element={<PosPage />} path="pos" />
+            <Route element={<Navigate to="/pos?mode=lookup" replace />} path="staff/pos" />
           </Route>
 
           {/* Orders: Owner, Manager, Cashier, Barista */}

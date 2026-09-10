@@ -7,7 +7,7 @@ export async function fetchAllOrders() {
 
 export async function updateOrderStatus(orderId, newStatus) {
   const response = await apiClient.patch(`/orders/${orderId}/status`, {
-    status: newStatus,
+    status: (newStatus || "").toLowerCase(),
   });
   return response.data;
 }
@@ -17,8 +17,9 @@ export async function createPosOrder(payload) {
   return response.data;
 }
 
-export async function lookupPendingCounterOrders(query) {
-  const response = await apiClient.get(`/orders/counter-lookup?q=${encodeURIComponent(query)}`);
+export async function lookupPendingCounterOrders(query = "") {
+  const qStr = query ? `?q=${encodeURIComponent(query)}` : "";
+  const response = await apiClient.get(`/orders/counter-lookup${qStr}`);
   return response.data;
 }
 
@@ -37,5 +38,10 @@ export async function trackCustomerOrder(orderId, email) {
     order_id: Number(orderId),
     email: email.trim().toLowerCase(),
   });
+  return response.data;
+}
+
+export async function updatePendingOrder(orderId, payload) {
+  const response = await apiClient.put(`/orders/${orderId}`, payload);
   return response.data;
 }

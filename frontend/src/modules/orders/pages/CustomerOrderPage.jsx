@@ -1,13 +1,36 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { fetchMenuCatalog } from "../../menu/api/menuApi";
 import { getImageUrl } from "../../menu/utils/image";
 import { payCustomerOrder } from "../../payments/api/paymentsApi";
 import { submitCustomerOrder } from "../api/ordersApi";
+import { downloadReceipt, printReceipt } from "../utils/receiptUtils";
 
 export default function CustomerOrderPage() {
+  const location = useLocation();
   const [catalog, setCatalog] = useState([]);
-  const [cart, setCart] = useState([]);
+  const [autoSelectedMessage, setAutoSelectedMessage] = useState(() => {
+    if (location.state?.preselected?.item) {
+      return `✓ "${location.state.preselected.item.item_name}" selected and added to your order!`;
+    }
+    return "";
+  });
+  const [cart, setCart] = useState(() => {
+    if (location.state?.preselected?.item) {
+      const { item, size, addons } = location.state.preselected;
+      return [
+        {
+          cartId: `${item.menu_item_id}-${Date.now()}-${Math.random()}`,
+          item,
+          size: size || (item.sizes?.find((s) => s.is_default) || item.sizes?.[0] || null),
+          addons: addons || [],
+          special_instructions: null,
+          quantity: 1,
+        },
+      ];
+    }
+    return [];
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
 
@@ -20,7 +43,8 @@ export default function CustomerOrderPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [orderType, setOrderType] = useState("takeout");
-  const [paymentMethodIntent, setPaymentMethodIntent] = useState("online_card"); // "online_card" | "online_ewallet" | "pay_at_counter"
+  const [paymentMethodIntent, setPaymentMethodIntent] = useState("pay_at_counter"); // "pay_at_counter" is active mode
+  const [paymentWarning, setPaymentWarning] = useState("");
 
   // Customization selection modal
   const [customizingItem, setCustomizingItem] = useState(null);
@@ -50,6 +74,66 @@ export default function CustomerOrderPage() {
   useEffect(() => {
     loadCatalog();
   }, []);
+
+  // Listen for navigation with preselected item from Browse
+  useEffect(() => {
+    if (location.state?.preselected?.item) {
+      const { item, size, addons } = location.state.preselected;
+      const selectedSize = size || (item.sizes?.find((s) => s.is_default) || item.sizes?.[0] || null);
+
+      setCart((prev) => {
+        const alreadyHas = prev.some((c) => c.item.menu_item_id === item.menu_item_id);
+        if (alreadyHas) return prev;
+        return [
+          ...prev,
+          {
+            cartId: `${item.menu_item_id}-${Date.now()}-${Math.random()}`,
+            item,
+            size: selectedSize,
+            addons: addons || [],
+            special_instructions: null,
+            quantity: 1,
+          },
+        ];
+      });
+
+      setAutoSelectedMessage(`✓ "${item.item_name}" selected and added to your order!`);
+      const timer = setTimeout(() => setAutoSelectedMessage(""), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.key, location.state]);
+
+  // Handle URL search parameter ?item_id=... once catalog is loaded
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const qItemId = params.get("item_id");
+    if (!qItemId || catalog.length === 0) return;
+
+    const allItems = catalog.flatMap((c) => c.items || []);
+    const matched = allItems.find((it) => it.menu_item_id.toString() === qItemId.toString());
+    if (matched) {
+      setCart((prev) => {
+        const alreadyHas = prev.some((c) => c.item.menu_item_id === matched.menu_item_id);
+        if (alreadyHas) return prev;
+        const defaultSize = matched.sizes?.find((s) => s.is_default) || matched.sizes?.[0] || null;
+        return [
+          ...prev,
+          {
+            cartId: `${matched.menu_item_id}-${Date.now()}-${Math.random()}`,
+            item: matched,
+            size: defaultSize,
+            addons: [],
+            special_instructions: null,
+            quantity: 1,
+          },
+        ];
+      });
+
+      setAutoSelectedMessage(`✓ "${matched.item_name}" selected and added to your order!`);
+      const timer = setTimeout(() => setAutoSelectedMessage(""), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.search, catalog]);
 
   function handleOpenCustomize(item) {
     setCustomizingItem(item);
@@ -137,22 +221,15 @@ export default function CustomerOrderPage() {
         })),
       };
 
-      const createdOrder = await submitCustomerOrder(orderPayload);
-
-      // If online payment (card / e-wallet), process payment now
+      // Online card and e-wallet are not yet integrated; require pay_at_counter
       if (paymentMethodIntent !== "pay_at_counter") {
-        const method = paymentMethodIntent === "online_ewallet" ? "ewallet" : "card";
-        const paidOrder = await payCustomerOrder(
-          createdOrder.order_id,
-          email.trim().toLowerCase(),
-          method
-        );
-        setConfirmedOrder(paidOrder);
-      } else {
-        // Pay at counter reservation
-        setConfirmedOrder(createdOrder);
+        setOrderError("⚠️ Online Card and E-Wallet payments are not yet integrated into our system. Please select 'Pay at Counter' to place your order.");
+        setIsSubmitting(false);
+        return;
       }
 
+      const createdOrder = await submitCustomerOrder(orderPayload);
+      setConfirmedOrder(createdOrder);
       setCart([]);
     } catch (err) {
       const status = err.response?.status;
@@ -211,10 +288,36 @@ export default function CustomerOrderPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
+        {/* AUTO-SELECTED DRINK FROM BROWSE FEEDBACK BANNER */}
+        {autoSelectedMessage && !confirmedOrder && (
+          <div className="mb-6 flex items-center justify-between rounded-3xl border-2 border-emerald-500 bg-emerald-50 p-4 text-xs font-bold text-emerald-950 shadow-md animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-xl text-emerald-800">
+                ☕
+              </span>
+              <div>
+                <span className="text-sm font-black text-emerald-950 block">
+                  {autoSelectedMessage}
+                </span>
+                <span className="text-[11px] font-semibold text-emerald-800/90">
+                  Your drink is ready in the order ticket below. Review your selections and choose your payment method.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAutoSelectedMessage("")}
+              className="rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100 transition"
+            >
+              Got it ✓
+            </button>
+          </div>
+        )}
+
         {/* CONFIRMATION BANNER / RECEIPT (COUNTER REFERENCE or PAID PICKUP CODE) */}
         {confirmedOrder && (
           <div className="mb-8 rounded-3xl border border-stone-200 bg-white p-6 shadow-xl sm:p-8 animate-in fade-in duration-200">
-            {confirmedOrder.payment_method_intent === "pay_at_counter" ? (
+            {(confirmedOrder.payment_method_intent === "pay_at_counter" || confirmedOrder.order_status === "awaiting_payment" || confirmedOrder.reference_code) ? (
               /* PAY AT COUNTER CONFIRMATION */
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-stone-100 pb-6">
@@ -230,34 +333,46 @@ export default function CustomerOrderPage() {
                         Order #{confirmedOrder.order_id} Reserved!
                       </h2>
                       <p className="text-xs text-stone-500">
-                        Held for 45 minutes • Please pay at the counter upon arrival
+                        Held for 24 hours (1 Day) • Please present code at the counter upon arrival
                       </p>
                     </div>
                   </div>
 
-                  {/* REFERENCE CODE */}
-                  <div className="rounded-2xl border-2 border-amber-600 bg-amber-50/80 p-4 text-center shadow-md min-w-[200px]">
+                  {/* REFERENCE CODE WITH QUICK COPY */}
+                  <div className="rounded-2xl border-2 border-amber-600 bg-amber-50/90 p-4 text-center shadow-md min-w-[220px]">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-900 block">
                       Your Reference Code
                     </span>
-                    <span className="text-3xl font-black tracking-widest text-amber-950 block mt-1">
+                    <span className="text-3xl font-black tracking-widest text-amber-950 block mt-1 select-all">
                       {confirmedOrder.reference_code || `REF-${confirmedOrder.order_id}`}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const code = confirmedOrder.reference_code || `REF-${confirmedOrder.order_id}`;
+                        navigator.clipboard?.writeText(code);
+                        alert(`Copied Reference Code: ${code}`);
+                      }}
+                      className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-200 px-2.5 py-1 text-[11px] font-black text-amber-950 hover:bg-amber-300 transition"
+                    >
+                      <span>📋</span>
+                      <span>Copy Code</span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-2xl bg-stone-50 p-4 text-xs text-stone-700 space-y-1 border border-stone-200">
+                <div className="mt-4 rounded-2xl bg-stone-50 p-4 text-xs text-stone-700 space-y-1.5 border border-stone-200">
                   <span className="font-extrabold text-stone-900 block">
                     📍 What to do next:
                   </span>
                   <p>
-                    1. Head to the store counter and show your Reference Code <strong>{confirmedOrder.reference_code}</strong> to the cashier.
+                    1. Head to the store counter and give your Reference Code <strong>{confirmedOrder.reference_code || `REF-${confirmedOrder.order_id}`}</strong> to the cashier.
                   </p>
                   <p>
-                    2. The cashier will pull up your order instantly and collect your payment (Cash or Card).
+                    2. The cashier will look up your order on the POS register, adjust any items/sizes if you wish, and process payment (Cash or Card).
                   </p>
                   <p>
-                    3. Once charged, your official receipt &amp; pickup code will be issued, and the barista will start brewing!
+                    3. As soon as payment is confirmed, your order is dispatched immediately to the Barista Queue for fresh preparation!
                   </p>
                 </div>
 
@@ -316,6 +431,15 @@ export default function CustomerOrderPage() {
                 <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-emerald-900">
                   <span>Show this pickup code to the barista counter when picking up your drinks.</span>
                   <div className="flex items-center gap-2">
+                    {confirmedOrder.receipt_pdf_url && (
+                      <button
+                        type="button"
+                        onClick={() => downloadReceipt(confirmedOrder.receipt_pdf_url, confirmedOrder.order_id)}
+                        className="rounded-xl border border-emerald-300 bg-white px-3.5 py-2 font-bold text-emerald-950 hover:bg-emerald-50 transition"
+                      >
+                        📄 Download Receipt
+                      </button>
+                    )}
                     <Link
                       to={`/track?order_id=${confirmedOrder.order_id}&email=${encodeURIComponent(confirmedOrder.customer_email || email)}`}
                       className="rounded-xl bg-emerald-900 px-4 py-2 font-bold text-white hover:bg-emerald-950 transition"
@@ -635,51 +759,62 @@ export default function CustomerOrderPage() {
                 </div>
 
                 {/* PAYMENT METHOD TILES */}
-                <div className="space-y-1.5 pt-1">
-                  <label className="block text-[11px] font-bold text-stone-700">Payment Method</label>
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold text-stone-700">Payment Method</label>
+                    <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md">
+                      In-Store Counter Payment
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-3 gap-1.5">
+                    {/* PAY AT COUNTER (ACTIVE) */}
                     <button
                       type="button"
-                      onClick={() => setPaymentMethodIntent("online_card")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition ${
-                        paymentMethodIntent === "online_card"
-                          ? "border-amber-900 bg-amber-50/90 text-amber-950 ring-2 ring-amber-400"
-                          : "border-stone-200 bg-stone-50/50 text-stone-600 hover:bg-white"
-                      }`}
-                    >
-                      <span className="text-base">💳</span>
-                      <span className="text-[10px] font-black mt-1">Card</span>
-                      <span className="text-[8px] text-stone-400">Instant</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethodIntent("online_ewallet")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition ${
-                        paymentMethodIntent === "online_ewallet"
-                          ? "border-amber-900 bg-amber-50/90 text-amber-950 ring-2 ring-amber-400"
-                          : "border-stone-200 bg-stone-50/50 text-stone-600 hover:bg-white"
-                      }`}
-                    >
-                      <span className="text-base">📱</span>
-                      <span className="text-[10px] font-black mt-1">E-Wallet</span>
-                      <span className="text-[8px] text-stone-400">Instant</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPaymentMethodIntent("pay_at_counter")}
-                      className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition ${
-                        paymentMethodIntent === "pay_at_counter"
-                          ? "border-amber-900 bg-amber-50/90 text-amber-950 ring-2 ring-amber-400"
-                          : "border-stone-200 bg-stone-50/50 text-stone-600 hover:bg-white"
-                      }`}
+                      onClick={() => {
+                        setPaymentMethodIntent("pay_at_counter");
+                        setPaymentWarning("");
+                      }}
+                      className="col-span-1 flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition border-amber-900 bg-amber-50/90 text-amber-950 ring-2 ring-amber-400 shadow-xs"
                     >
                       <span className="text-base">🏪</span>
                       <span className="text-[10px] font-black mt-1">Pay at Counter</span>
-                      <span className="text-[8px] text-amber-800 font-bold">45m Hold</span>
+                      <span className="text-[8px] text-amber-800 font-bold">1-Day Hold</span>
+                    </button>
+
+                    {/* ONLINE CARD (NOT INTEGRATED) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentWarning("Card online payment is not yet integrated. Please select 'Pay at Counter' — you can still pay with Card or Cash when you arrive at the store counter!");
+                      }}
+                      className="opacity-60 hover:opacity-85 flex flex-col items-center justify-center p-2.5 rounded-2xl border border-stone-200 bg-stone-100 text-stone-500 text-center transition"
+                    >
+                      <span className="text-base">💳</span>
+                      <span className="text-[10px] font-black mt-1 line-through">Card</span>
+                      <span className="text-[8px] text-rose-700 font-bold">Not Integrated</span>
+                    </button>
+
+                    {/* ONLINE EWALLET (NOT INTEGRATED) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentWarning("E-Wallet online payment is not yet integrated. Please select 'Pay at Counter' — you can still pay with GCash, Maya, Card, or Cash at the store counter!");
+                      }}
+                      className="opacity-60 hover:opacity-85 flex flex-col items-center justify-center p-2.5 rounded-2xl border border-stone-200 bg-stone-100 text-stone-500 text-center transition"
+                    >
+                      <span className="text-base">📱</span>
+                      <span className="text-[10px] font-black mt-1 line-through">E-Wallet</span>
+                      <span className="text-[8px] text-rose-700 font-bold">Not Integrated</span>
                     </button>
                   </div>
+
+                  {paymentWarning && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 text-[11px] font-bold text-amber-900 flex items-start justify-between gap-2 animate-in fade-in duration-150">
+                      <span>⚠️ {paymentWarning}</span>
+                      <button type="button" onClick={() => setPaymentWarning("")} className="text-stone-400 hover:text-stone-700">✕</button>
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -689,9 +824,7 @@ export default function CustomerOrderPage() {
                 >
                   {isSubmitting
                     ? "Securing Order..."
-                    : paymentMethodIntent === "pay_at_counter"
-                    ? `Reserve & Pay at Counter (₱${total.toFixed(2)}) 🏪`
-                    : `Pay ₱${total.toFixed(2)} & Confirm Order 💳`}
+                    : `Reserve & Pay at Counter (₱${total.toFixed(2)}) 🏪`}
                 </button>
               </form>
             </div>
@@ -770,9 +903,9 @@ export default function CustomerOrderPage() {
                             checked={isChecked}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedAddons((prev) => [...prev, a]);
+                                setModalAddons((prev) => [...prev, a]);
                               } else {
-                                setSelectedAddons((prev) =>
+                                setModalAddons((prev) =>
                                   prev.filter((x) => x.menu_item_addon_id !== a.menu_item_addon_id)
                                 );
                               }

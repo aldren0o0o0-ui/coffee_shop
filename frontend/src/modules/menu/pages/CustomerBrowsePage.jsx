@@ -351,13 +351,25 @@ export default function CustomerBrowsePage() {
                     Details &amp; Recipe →
                   </button>
 
-                  <Link
-                    className="flex items-center gap-1 rounded-full bg-[#c8860a] px-3.5 py-1.5 text-xs font-bold text-[#140e08] shadow-sm transition hover:bg-[#e6a832] active:scale-95"
-                    to="/order"
+                  <button
+                    className="flex items-center gap-1 rounded-full bg-[#c8860a] px-3.5 py-1.5 text-xs font-bold text-[#140e08] shadow-sm transition hover:bg-[#e6a832] active:scale-95 cursor-pointer"
+                    onClick={() => {
+                      const defaultSize = item.sizes?.find((s) => s.is_default) || item.sizes?.[0] || null;
+                      navigate(`/order?item_id=${item.menu_item_id}`, {
+                        state: {
+                          preselected: {
+                            item,
+                            size: defaultSize,
+                            addons: [],
+                          },
+                        },
+                      });
+                    }}
+                    type="button"
                   >
                     <span>Order</span>
                     <span>→</span>
-                  </Link>
+                  </button>
                 </div>
               </article>
             ))}
@@ -507,8 +519,13 @@ export default function CustomerBrowsePage() {
               <button
                 className="flex items-center gap-2 rounded-full bg-[#c8860a] px-5 py-2.5 text-xs font-bold text-[#140e08] shadow-md transition hover:bg-[#e6a832]"
                 onClick={() => {
+                  const preselected = {
+                    item: activeItemModal,
+                    size: modalSelectedSize,
+                    addons: modalSelectedAddons,
+                  };
                   setActiveItemModal(null);
-                  navigate("/order");
+                  navigate(`/order?item_id=${activeItemModal.menu_item_id}`, { state: { preselected } });
                 }}
                 type="button"
               >

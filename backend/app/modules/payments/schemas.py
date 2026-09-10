@@ -13,9 +13,13 @@ class CustomerPaymentRequest(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=100, description="Client generated UUID for idempotent payments")
 
 
+from app.modules.orders.schemas import OrderItemCreate
+
+
 class PayAtCounterRequest(BaseModel):
     payment_method: PaymentMethod = PaymentMethod.CASH
     amount_tendered: Decimal | None = None
+    items: list[OrderItemCreate] | None = None
 
 
 class PaymentResponse(BaseModel):

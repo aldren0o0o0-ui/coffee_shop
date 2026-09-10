@@ -21,7 +21,7 @@ export default function EditProductModal({
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
-  const [basePrice, setBasePrice] = useState("4.50");
+  const [basePrice, setBasePrice] = useState("100.00");
   const [isAvailable, setIsAvailable] = useState(true);
 
   // Photos

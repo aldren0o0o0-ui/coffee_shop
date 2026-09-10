@@ -11,13 +11,61 @@ export default function LandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(75);
-  const [formStatus, setFormStatus] = useState("idle"); // idle | sent
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    subject: "",
-    message: "",
-  });
+
+  // Reviews State
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewHoverRating, setReviewHoverRating] = useState(0);
+  const [reviewName, setReviewName] = useState("");
+  const [reviewDrink, setReviewDrink] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+
+  const [reviewsList, setReviewsList] = useState([
+    {
+      id: 1,
+      name: "Camille Santos",
+      role: "Verified Guest",
+      rating: 5,
+      drink: "Artisan Spanish Latte",
+      date: "Yesterday",
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&q=80",
+      comment:
+        "The Artisan Spanish Latte is easily the best in the city. Perfectly balanced sweetness, bold espresso punch, and the warm cinnamon dust makes it irresistible every single morning.",
+    },
+    {
+      id: 2,
+      name: "Mark Villafuerte",
+      role: "Pour-Over Connoisseur",
+      rating: 5,
+      drink: "Single-Origin Benguet V60",
+      date: "3 days ago",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80",
+      comment:
+        "As someone who drinks single-origin manual pour-overs exclusively, their Benguet Arabica completely blew me away. Crisp jasmine floral aroma, clean bergamot finish, and the baristas genuinely understand extraction science.",
+    },
+    {
+      id: 3,
+      name: "Arianne Chen",
+      role: "Digital Nomad & Designer",
+      rating: 5,
+      drink: "Sea Salt Caramel Cold Brew",
+      date: "1 week ago",
+      avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&q=80",
+      comment:
+        "The ambience is cozy, the lo-fi cafe playlist is soothing, and the Sea Salt Caramel cold foam is dangerously delicious. Reliable WiFi and ergonomic seating make it my favorite work-from-cafe spot!",
+    },
+    {
+      id: 4,
+      name: "Dave Ramos",
+      role: "Daily Commuter",
+      rating: 5,
+      drink: "Velvet Flat White",
+      date: "2 weeks ago",
+      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&q=80",
+      comment:
+        "Super seamless online ordering and 4-digit pickup code system. I placed my order on my phone on the jeepney, arrived, and my flat white was freshly poured with perfect microfoam within 2 minutes.",
+    },
+  ]);
 
   const audioRef = useRef(null);
 
@@ -53,13 +101,31 @@ export default function LandingPage() {
     }
   }
 
-  function handleFormSubmit(e) {
+  function handleReviewSubmit(e) {
     e.preventDefault();
-    setFormStatus("sent");
+    if (!reviewName.trim() || !reviewComment.trim()) return;
+
+    const newReview = {
+      id: Date.now(),
+      name: reviewName.trim(),
+      role: "Verified Guest",
+      rating: reviewRating,
+      drink: reviewDrink.trim() || "House Specialty Drink",
+      date: "Just now",
+      avatar: null,
+      comment: reviewComment.trim(),
+    };
+
+    setReviewsList([newReview, ...reviewsList]);
+    setReviewSubmitted(true);
+    setReviewName("");
+    setReviewDrink("");
+    setReviewComment("");
+    setReviewRating(5);
+
     setTimeout(() => {
-      setFormData({ name: "", email: "", subject: "", message: "" });
-      setFormStatus("idle");
-    }, 4000);
+      setReviewSubmitted(false);
+    }, 5000);
   }
 
   return (
@@ -118,8 +184,8 @@ export default function LandingPage() {
             </Link>
           </li>
           <li>
-            <a href="#contact" className="transition hover:text-[#f5e6d3]">
-              Contact
+            <a href="#reviews" className="transition hover:text-[#f5e6d3]">
+              Reviews
             </a>
           </li>
         </ul>
@@ -215,10 +281,10 @@ export default function LandingPage() {
                 Order Online
               </Link>
               <a
-                href="#contact"
-                className="text-xs font-semibold text-[#e6a832] underline hover:text-[#f4c265] py-2 px-1"
+                href="#reviews"
+                className="flex items-center gap-1.5 text-xs font-bold text-[#e6a832] underline hover:text-[#f4c265] py-2 px-1 transition"
               >
-                Reserve a Table
+                <span>⭐ 4.9 Customer Reviews</span>
               </a>
             </div>
           </div>
@@ -437,125 +503,254 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CONTACT & RESERVATION SECTION */}
-      <section id="contact" className="border-t border-[#c8860a]/20 bg-[#1e1509] px-6 py-20 sm:px-12 sm:py-28">
-        <div className="mx-auto flex max-w-6xl flex-col gap-12 lg:flex-row lg:gap-16">
-          {/* Contact Details */}
-          <div className="flex-1">
-            <span className="text-xs font-bold tracking-widest text-[#c8860a] uppercase">Get in Touch</span>
-            <h2 className="mt-3 font-serif text-3xl sm:text-4xl font-bold text-white">We Would Love to Hear from You</h2>
-            <p className="mt-4 text-sm leading-relaxed text-[#b8a08a]">
-              Have a question, a reservation request, or just want to say hi? Drop us a message and we will get back to you as soon as the espresso is done brewing.
-            </p>
+      {/* REVIEWS & COMMUNITY SECTION */}
+      <section id="reviews" className="border-t border-[#c8860a]/20 bg-[#1e1509] px-6 py-20 sm:px-12 sm:py-28">
+        <div className="mx-auto max-w-6xl space-y-12">
+          {/* Section Header */}
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div className="max-w-2xl">
+              <span className="text-xs font-bold tracking-widest text-[#c8860a] uppercase">
+                Community Feedback &amp; Reviews
+              </span>
+              <h2 className="mt-3 font-serif text-3xl sm:text-4xl font-bold text-white">
+                Loved by Coffee Lovers,<br />
+                <span className="text-[#e6a832]">Reviewed with Heart</span>
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed text-[#b8a08a]">
+                Read authentic feedback from daily commuters, remote creatives, and specialty connoisseurs who make LDRN&apos;s Coffee part of their daily ritual.
+              </p>
+            </div>
 
-            <div className="mt-8 space-y-5">
-              <div className="flex items-start gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c8860a]/30 bg-[#2a1c0d] text-lg">
-                  📍
-                </span>
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Visit Us</h4>
-                  <p className="text-sm text-[#b8a08a]">123 Unahan sa Amoa, Cebu City, Philippines</p>
-                </div>
+            {/* Aggregate Score Card */}
+            <div className="flex items-center gap-4 rounded-3xl border border-[#c8860a]/30 bg-[#2a1c0d] p-5 shadow-xl shrink-0">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#c8860a] text-2xl font-serif font-black text-[#140e08]">
+                4.9
               </div>
-
-              <div className="flex items-start gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c8860a]/30 bg-[#2a1c0d] text-lg">
-                  🕐
-                </span>
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Opening Hours</h4>
-                  <p className="text-sm text-[#b8a08a]">Open Daily: 5:00 AM – 10:00 PM</p>
+              <div>
+                <div className="flex items-center gap-1 text-sm text-[#e6a832]">
+                  {"★".repeat(5)}
                 </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c8860a]/30 bg-[#2a1c0d] text-lg">
-                  📧
-                </span>
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Email Us</h4>
-                  <p className="text-sm text-[#b8a08a]">hello@ldrncoffee.com</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c8860a]/30 bg-[#2a1c0d] text-lg">
-                  📞
-                </span>
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Call Us</h4>
-                  <p className="text-sm text-[#b8a08a]">+63 123 456 7890</p>
-                </div>
+                <p className="text-xs font-bold text-white mt-0.5">Over 1,200+ Verified Ratings</p>
+                <span className="text-[11px] text-[#b8a08a]">Top-rated roastery cafe in Cebu</span>
               </div>
             </div>
           </div>
 
-          {/* Interactive Contact Form */}
-          <div className="flex-1 rounded-3xl border border-[#c8860a]/20 bg-[#2a1c0d] p-8 shadow-2xl">
-            <h3 className="font-serif text-2xl font-bold text-white">Send Us a Message</h3>
-            <p className="mt-1 text-xs text-[#b8a08a]">We respond to all table reservations and inquiries daily.</p>
-
-            <form onSubmit={handleFormSubmit} className="mt-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#b8a08a] uppercase tracking-wider">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Juan dela Cruz"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-[#c8860a]/30 bg-[#140e08] px-4 py-3 text-sm text-[#f5e6d3] outline-none transition placeholder:text-[#b8a08a]/50 focus:border-[#c8860a] focus:ring-2 focus:ring-[#c8860a]/20"
-                />
+          {/* Reviews Grid & Review Form Container */}
+          <div className="grid gap-8 lg:grid-cols-12">
+            {/* Left 7 Columns: Existing Reviews Cards */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-lg font-bold text-white">
+                  Recent Guest Reviews ({reviewsList.length})
+                </h3>
+                <span className="text-xs text-[#b8a08a] font-medium">Verified Experiences</span>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#b8a08a] uppercase tracking-wider">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="you@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-[#c8860a]/30 bg-[#140e08] px-4 py-3 text-sm text-[#f5e6d3] outline-none transition placeholder:text-[#b8a08a]/50 focus:border-[#c8860a] focus:ring-2 focus:ring-[#c8860a]/20"
-                />
+              <div className="space-y-4 max-h-[580px] overflow-y-auto pr-1">
+                {reviewsList.map((rev) => (
+                  <div
+                    key={rev.id}
+                    className="rounded-3xl border border-[#c8860a]/20 bg-[#2a1c0d] p-6 shadow-md transition duration-300 hover:border-[#c8860a]/50 hover:shadow-xl space-y-3"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        {rev.avatar ? (
+                          <img
+                            src={rev.avatar}
+                            alt={rev.name}
+                            className="h-10 w-10 rounded-full object-cover border border-[#c8860a]/40"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#c8860a] font-bold text-xs text-[#140e08]">
+                            {rev.name.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="font-bold text-white text-sm">{rev.name}</h4>
+                          <span className="text-[11px] text-[#b8a08a]">{rev.role}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-xs text-[#e6a832]">
+                          {"★".repeat(rev.rating)}
+                          {"☆".repeat(5 - rev.rating)}
+                        </div>
+                        <span className="text-[10px] text-[#b8a08a]">{rev.date}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs sm:text-sm leading-relaxed text-[#f5e6d3]/90 italic">
+                      &ldquo;{rev.comment}&rdquo;
+                    </p>
+
+                    {rev.drink && (
+                      <div className="pt-2 border-t border-[#c8860a]/10 flex items-center gap-1.5">
+                        <span className="text-xs">☕</span>
+                        <span className="text-[11px] font-semibold text-[#e6a832]">
+                          Favorite Drink: <strong className="text-white">{rev.drink}</strong>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right 5 Columns: Interactive "Share Your Review" Card */}
+            <div className="lg:col-span-5">
+              <div className="rounded-3xl border border-[#c8860a]/30 bg-[#2a1c0d] p-7 shadow-2xl space-y-5 sticky top-24">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase text-[#c8860a] tracking-wider block">
+                    Your Voice Matters
+                  </span>
+                  <h3 className="font-serif text-2xl font-bold text-white mt-1">Leave a Review</h3>
+                  <p className="mt-1 text-xs text-[#b8a08a]">
+                    Visited us recently? Share your thoughts on our coffee, vibe, or barista team.
+                  </p>
+                </div>
+
+                {reviewSubmitted && (
+                  <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/40 p-4 text-xs font-bold text-emerald-300 animate-in fade-in">
+                    ✓ Thank you for your review! Your feedback was posted to our community board.
+                  </div>
+                )}
+
+                <form onSubmit={handleReviewSubmit} className="space-y-4">
+                  {/* Star Rating Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#b8a08a] uppercase tracking-wider mb-1.5">
+                      Your Rating
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewRating(star)}
+                          onMouseEnter={() => setReviewHoverRating(star)}
+                          onMouseLeave={() => setReviewHoverRating(0)}
+                          className="text-2xl transition hover:scale-125 focus:outline-none"
+                        >
+                          <span
+                            className={
+                              (reviewHoverRating || reviewRating) >= star
+                                ? "text-[#e6a832]"
+                                : "text-stone-700"
+                            }
+                          >
+                            ★
+                          </span>
+                        </button>
+                      ))}
+                      <span className="ml-2 text-xs font-bold text-[#f5e6d3]">
+                        {reviewRating === 5
+                          ? "5.0 — Exceptional! ☕"
+                          : reviewRating === 4
+                          ? "4.0 — Great Experience"
+                          : reviewRating === 3
+                          ? "3.0 — Average"
+                          : `${reviewRating}.0 — Needs Improvement`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#b8a08a] uppercase tracking-wider">
+                      Your Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Maria Santos"
+                      value={reviewName}
+                      onChange={(e) => setReviewName(e.target.value)}
+                      className="mt-1.5 w-full rounded-xl border border-[#c8860a]/30 bg-[#140e08] px-4 py-2.5 text-xs text-[#f5e6d3] outline-none transition placeholder:text-[#b8a08a]/50 focus:border-[#c8860a] focus:ring-2 focus:ring-[#c8860a]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#b8a08a] uppercase tracking-wider">
+                      Drink or Dish Enjoyed (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Artisan Spanish Latte / V60"
+                      value={reviewDrink}
+                      onChange={(e) => setReviewDrink(e.target.value)}
+                      className="mt-1.5 w-full rounded-xl border border-[#c8860a]/30 bg-[#140e08] px-4 py-2.5 text-xs text-[#f5e6d3] outline-none transition placeholder:text-[#b8a08a]/50 focus:border-[#c8860a] focus:ring-2 focus:ring-[#c8860a]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#b8a08a] uppercase tracking-wider">
+                      Review &amp; Thoughts *
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      placeholder="Tell us what you loved about the brew, ambience, or service…"
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      className="mt-1.5 w-full rounded-xl border border-[#c8860a]/30 bg-[#140e08] px-4 py-2.5 text-xs text-[#f5e6d3] outline-none transition placeholder:text-[#b8a08a]/50 focus:border-[#c8860a] focus:ring-2 focus:ring-[#c8860a]/20"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full rounded-full bg-[#c8860a] py-3 text-xs font-bold text-[#140e08] shadow-md transition hover:bg-[#e6a832] hover:scale-[1.01]"
+                  >
+                    Post Your Review ⭐
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Visiting & Store Information Bar */}
+          <div className="rounded-3xl border border-[#c8860a]/20 bg-[#2a1c0d]/60 p-6 sm:p-8">
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+              <div className="flex items-start gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#c8860a]/20 text-sm">
+                  📍
+                </span>
+                <div>
+                  <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Roastery Location</h4>
+                  <p className="text-[#b8a08a] mt-0.5">123 Unahan sa Amoa, Cebu City, Philippines</p>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#b8a08a] uppercase tracking-wider">Subject</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Table reservation for 2"
-                  value={formData.subject}
-                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-[#c8860a]/30 bg-[#140e08] px-4 py-3 text-sm text-[#f5e6d3] outline-none transition placeholder:text-[#b8a08a]/50 focus:border-[#c8860a] focus:ring-2 focus:ring-[#c8860a]/20"
-                />
+              <div className="flex items-start gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#c8860a]/20 text-sm">
+                  🕐
+                </span>
+                <div>
+                  <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Store Hours</h4>
+                  <p className="text-[#b8a08a] mt-0.5">Open Daily: 5:00 AM – 10:00 PM</p>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#b8a08a] uppercase tracking-wider">Message</label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Tell us how we can help…"
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  className="mt-1.5 w-full rounded-xl border border-[#c8860a]/30 bg-[#140e08] px-4 py-3 text-sm text-[#f5e6d3] outline-none transition placeholder:text-[#b8a08a]/50 focus:border-[#c8860a] focus:ring-2 focus:ring-[#c8860a]/20"
-                />
+              <div className="flex items-start gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#c8860a]/20 text-sm">
+                  📧
+                </span>
+                <div>
+                  <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Direct Inquiries</h4>
+                  <p className="text-[#b8a08a] mt-0.5">hello@ldrncoffee.com</p>
+                </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={formStatus === "sent"}
-                className={`w-full rounded-full py-3.5 text-xs font-bold tracking-wider uppercase transition duration-200 ${
-                  formStatus === "sent"
-                    ? "bg-emerald-600 text-white"
-                    : "bg-[#c8860a] text-[#140e08] hover:bg-[#e6a832] shadow-md hover:scale-[1.01]"
-                }`}
-              >
-                {formStatus === "sent" ? "Message Sent! ✅" : "Send Message ✉️"}
-              </button>
-            </form>
+              <div className="flex items-start gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#c8860a]/20 text-sm">
+                  📞
+                </span>
+                <div>
+                  <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Phone Support</h4>
+                  <p className="text-[#b8a08a] mt-0.5">+63 123 456 7890</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -590,6 +785,11 @@ export default function LandingPage() {
               <li>
                 <a href="#about" className="hover:text-[#e6a832]">
                   About Us
+                </a>
+              </li>
+              <li>
+                <a href="#reviews" className="hover:text-[#e6a832]">
+                  Customer Reviews ⭐
                 </a>
               </li>
               <li>

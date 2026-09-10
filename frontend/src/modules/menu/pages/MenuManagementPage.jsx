@@ -817,14 +817,16 @@ export default function MenuManagementPage() {
       )}
 
       {/* 6-STEP PRODUCT CREATION WIZARD MODAL */}
-      <ProductWizardModal
-        isOpen={isAddProductOpen}
-        onClose={() => setIsAddProductOpen(false)}
-        categories={catalog}
-        inventoryOptions={inventoryOptions}
-        onProductPublished={handleProductPublished}
-        onInventoryItemCreated={(newItem) => setInventoryOptions((prev) => [...prev, newItem])}
-      />
+      {isAddProductOpen && (
+        <ProductWizardModal
+          isOpen={isAddProductOpen}
+          onClose={() => setIsAddProductOpen(false)}
+          categories={catalog}
+          inventoryOptions={inventoryOptions}
+          onProductPublished={handleProductPublished}
+          onInventoryItemCreated={(newItem) => setInventoryOptions((prev) => [...prev, newItem])}
+        />
+      )}
     </div>
   );
 }

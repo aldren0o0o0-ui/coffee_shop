@@ -30,6 +30,7 @@ from app.modules.orders.models import (
 )
 from app.modules.orders.schemas import (
     CustomerOrderCreateRequest,
+    OrderItemCreate,
     POSOrderCreateRequest,
 )
 from app.modules.payments import service as payments_service
@@ -204,7 +205,7 @@ def create_customer_order(
     now = utc_now()
     is_pay_at_counter = payload.payment_method_intent == "pay_at_counter"
     if is_pay_at_counter:
-        expires_at = now + timedelta(minutes=45)  # 45-minute reservation for store travel
+        expires_at = now + timedelta(days=1)  # 24-hour (1 day) reservation for store visit
         reference_code = generate_unique_reference_code(database)
     else:
         expires_at = now + timedelta(minutes=10)  # 10-minute hold for online checkout
@@ -252,6 +253,14 @@ def create_customer_order(
 
     database.commit()
     database.refresh(order)
+
+    if is_pay_at_counter and existing_customer and existing_customer.email:
+        try:
+            from app.shared.email_service import send_counter_order_confirmation_email
+            send_counter_order_confirmation_email(order, existing_customer.email, run_async=True)
+        except Exception as exc:
+            logger.error(f"Failed to dispatch counter order email for #{order.order_id}: {exc}")
+
     return order
 
 
@@ -532,14 +541,32 @@ def create_pos_order(
 
 def lookup_pending_counter_order(
     database: Session,
-    search_query: str,
+    search_query: str = "",
 ) -> list[Order]:
     """
     Finds active AWAITING_PAYMENT counter orders by reference code, customer email, or name.
+    If search_query is empty, returns all active awaiting payment counter orders.
     Scoped strictly to: order_status == AWAITING_PAYMENT, payment_method_intent == 'pay_at_counter', and expires_at > now.
     """
     now = utc_now()
-    q = search_query.strip().lower()
+    q = (search_query or "").strip().lower()
+
+    conditions = [
+        Order.order_status == OrderStatus.AWAITING_PAYMENT,
+        Order.payment_method_intent == "pay_at_counter",
+        Order.expires_at > now,
+    ]
+
+    if q:
+        conditions.append(
+            or_(
+                func.lower(Order.reference_code) == q,
+                func.lower(Order.reference_code) == f"ref-{q}",
+                func.lower(Customer.email) == q,
+                func.lower(Customer.first_name).ilike(f"%{q}%"),
+                func.lower(Customer.last_name).ilike(f"%{q}%"),
+            )
+        )
 
     stmt = (
         select(Order)
@@ -550,17 +577,7 @@ def lookup_pending_counter_order(
             selectinload(Order.order_items).selectinload(OrderItem.menu_item_size),
             selectinload(Order.order_items).selectinload(OrderItem.addons).selectinload(OrderItemAddon.menu_item_addon),
         )
-        .where(
-            Order.order_status == OrderStatus.AWAITING_PAYMENT,
-            Order.payment_method_intent == "pay_at_counter",
-            Order.expires_at > now,
-            or_(
-                func.lower(Order.reference_code) == q,
-                func.lower(Order.reference_code) == f"ref-{q}",
-                func.lower(Customer.email) == q,
-                func.lower(Customer.first_name).ilike(f"%{q}%"),
-            ),
-        )
+        .where(*conditions)
         .order_by(Order.order_date.desc())
     )
     return list(database.scalars(stmt).all())
@@ -578,6 +595,138 @@ def pay_pending_counter_order(
         payload=payload,
         cashier_user=cashier_user,
     )
+
+
+def update_order_items_and_totals(
+    database: Session,
+    order: Order,
+    items: list[OrderItemCreate],
+    order_type: OrderType | None = None,
+) -> None:
+    if order.order_status != OrderStatus.AWAITING_PAYMENT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot edit items for order in '{order.order_status.value}' status.",
+        )
+
+    if order_type:
+        order.order_type = order_type
+
+    subtotal = Decimal("0.00")
+    order_items_to_create = []
+
+    for item_data in items:
+        menu_item = database.get(MenuItem, item_data.menu_item_id)
+        if not menu_item or not menu_item.is_available:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected menu item is currently unavailable.",
+            )
+
+        unit_price = menu_item.base_price
+
+        if item_data.menu_item_size_id:
+            size_obj = database.get(MenuItemSize, item_data.menu_item_size_id)
+            if not size_obj or size_obj.menu_item_id != menu_item.menu_item_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid drink size specified for {menu_item.item_name}.",
+                )
+            unit_price += size_obj.price_adjustment
+
+        item_subtotal = unit_price * item_data.quantity
+
+        addons_to_create = []
+        for addon_data in item_data.addons:
+            addon_obj = database.get(MenuItemAddon, addon_data.menu_item_addon_id)
+            if not addon_obj or addon_obj.menu_item_id != menu_item.menu_item_id or not addon_obj.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="One of the selected customizations is unavailable.",
+                )
+            addon_subtotal = addon_obj.additional_price * addon_data.quantity
+            item_subtotal += addon_subtotal
+            addons_to_create.append((addon_obj, addon_data.quantity))
+
+        subtotal += item_subtotal
+        order_items_to_create.append({
+            "menu_item": menu_item,
+            "size_id": item_data.menu_item_size_id,
+            "quantity": item_data.quantity,
+            "unit_price": unit_price,
+            "subtotal": item_subtotal,
+            "special_instructions": item_data.special_instructions,
+            "addons": addons_to_create,
+        })
+
+    tax_rate = Decimal("0.08")  # 8% Sales tax
+    tax_amount = (subtotal * tax_rate).quantize(Decimal("0.01"))
+    total_amount = subtotal + tax_amount
+
+    # Delete existing items and add-ons
+    for oi in list(order.order_items):
+        for oia in list(oi.addons):
+            database.delete(oia)
+        database.delete(oi)
+    database.flush()
+
+    # Re-create items and add-ons
+    for item_dict in order_items_to_create:
+        order_item = OrderItem(
+            order_id=order.order_id,
+            menu_item_id=item_dict["menu_item"].menu_item_id,
+            menu_item_size_id=item_dict["size_id"],
+            quantity=item_dict["quantity"],
+            unit_price=item_dict["unit_price"],
+            subtotal=item_dict["subtotal"],
+            special_instructions=item_dict["special_instructions"],
+        )
+        database.add(order_item)
+        database.flush()
+
+        for addon_obj, addon_qty in item_dict["addons"]:
+            order_item_addon = OrderItemAddon(
+                order_item_id=order_item.order_item_id,
+                menu_item_addon_id=addon_obj.menu_item_addon_id,
+                quantity=addon_qty,
+                unit_price=addon_obj.additional_price,
+            )
+            database.add(order_item_addon)
+
+    order.subtotal = subtotal
+    order.tax_amount = tax_amount
+    order.total_amount = total_amount
+    database.flush()
+
+
+def update_pending_order(
+    database: Session,
+    order_id: int,
+    items: list[OrderItemCreate],
+    order_type: OrderType | None,
+    cashier_user: User,
+) -> Order:
+    stmt = (
+        select(Order)
+        .options(
+            selectinload(Order.customer),
+            selectinload(Order.order_items).selectinload(OrderItem.menu_item),
+            selectinload(Order.order_items).selectinload(OrderItem.menu_item_size),
+            selectinload(Order.order_items).selectinload(OrderItem.addons).selectinload(OrderItemAddon.menu_item_addon),
+        )
+        .where(Order.order_id == order_id)
+    )
+    order = database.scalar(stmt)
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found.",
+        )
+
+    update_order_items_and_totals(database, order, items, order_type)
+    database.commit()
+    database.refresh(order)
+    return order
 
 
 def get_all_orders(

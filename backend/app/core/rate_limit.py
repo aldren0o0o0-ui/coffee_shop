@@ -78,17 +78,18 @@ def check_payment_attempt_rate_limit(order_id: int, ip_address: str | None) -> b
 
 def check_tracking_rate_limit(ip_address: str | None, email: str | None) -> bool:
     """
-    Limits order tracking queries to prevent ID and customer order enumeration:
-    - Max 10 tracking queries per 10 minutes per IP
-    - Max 10 tracking queries per 10 minutes per Email
+    Limits order tracking queries to prevent ID and customer order enumeration,
+    while allowing legitimate live tracking polling (12 requests/min):
+    - Max 120 tracking queries per 10 minutes per IP
+    - Max 120 tracking queries per 10 minutes per Email
     """
     if ip_address:
-        if not limiter.is_allowed(f"track_ip:{ip_address}", max_requests=10, window_seconds=600):
+        if not limiter.is_allowed(f"track_ip:{ip_address}", max_requests=120, window_seconds=600):
             return False
 
     if email:
         normalized_email = email.strip().lower()
-        if not limiter.is_allowed(f"track_email:{normalized_email}", max_requests=10, window_seconds=600):
+        if not limiter.is_allowed(f"track_email:{normalized_email}", max_requests=120, window_seconds=600):
             return False
 
     return True

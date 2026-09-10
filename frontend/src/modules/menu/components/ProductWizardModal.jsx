@@ -37,17 +37,17 @@ export default function ProductWizardModal({
   const fileInputRef = useRef(null);
 
   // Step 3: Pricing & Sizes
-  const [basePrice, setBasePrice] = useState("4.50");
+  const [basePrice, setBasePrice] = useState("100.00");
   const [hasSizes, setHasSizes] = useState(true);
   const [sizes, setSizes] = useState([
     { size_name: "Regular", price_adjustment: "0.00", is_default: true },
-    { size_name: "Large", price_adjustment: "1.00", is_default: false },
+    { size_name: "Large", price_adjustment: "20.00", is_default: false },
   ]);
 
   // Step 4: Customizations (Addons)
   const [addons, setAddons] = useState([
-    { addon_name: "Extra Espresso Shot", additional_price: "0.80", is_active: true },
-    { addon_name: "Oat Milk Substitute", additional_price: "0.75", is_active: true },
+    { addon_name: "Extra Espresso Shot", additional_price: "35.00", is_active: true },
+    { addon_name: "Oat Milk Substitute", additional_price: "30.00", is_active: true },
   ]);
 
   // Step 5: Recipe / Stock Link
@@ -144,6 +144,58 @@ export default function ProductWizardModal({
       setCategoryId(categories[0].category_id.toString());
     }
   }, [categories, categoryId]);
+
+  const resetForm = () => {
+    setCurrentStep(1);
+    setDraftId(null);
+    setDraftSavedTime(null);
+    setIsSavingDraft(false);
+    setIsPublishing(false);
+    setGlobalError("");
+    setName("");
+    setCategoryId(categories[0]?.category_id?.toString() || "");
+    setDescription("");
+    setErrors({});
+    setImages([]);
+    setIsDragging(false);
+    setBasePrice("100.00");
+    setHasSizes(true);
+    setSizes([
+      { size_name: "Regular", price_adjustment: "0.00", is_default: true },
+      { size_name: "Large", price_adjustment: "20.00", is_default: false },
+    ]);
+    setAddons([
+      { addon_name: "Extra Espresso Shot", additional_price: "35.00", is_active: true },
+      { addon_name: "Oat Milk Substitute", additional_price: "30.00", is_active: true },
+    ]);
+    setIngredients([]);
+    setIsQuickAddOpen(false);
+    setQuickAddForm({
+      item_name: "",
+      unit_of_measure: "kg",
+      quantity_on_hand: "10",
+      reorder_level: "2",
+      unit_cost: "0",
+    });
+    setIsSubmittingQuickAdd(false);
+    setQuickAddError("");
+    setQuickAddSuccess("");
+    setIsAvailable(true);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -478,6 +530,7 @@ export default function ProductWizardModal({
       if (onProductPublished) {
         onProductPublished(published);
       }
+      resetForm();
       onClose();
     } catch (err) {
       console.error("Publishing product failed:", err);
@@ -518,7 +571,7 @@ export default function ProductWizardModal({
             </div>
 
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition"
               title="Close wizard"
             >
@@ -1352,7 +1405,7 @@ export default function ProductWizardModal({
             ) : (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="rounded-xl px-4 py-2 text-xs font-bold text-stone-500 hover:text-stone-800 transition"
               >
                 Cancel

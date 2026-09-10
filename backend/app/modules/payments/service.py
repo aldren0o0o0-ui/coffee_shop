@@ -61,13 +61,16 @@ def generate_unique_pickup_code(database: Session) -> str:
 def validate_cash_tender(amount_due: Decimal, amount_tendered: Decimal | None) -> tuple[Decimal, Decimal]:
     """
     Validates that cash tendered is at least the total amount due.
+    If amount_tendered is None, defaults to exact cash (amount_due).
     Returns (amount_tendered, change_due).
     """
-    if amount_tendered is None or amount_tendered < amount_due:
-        tendered_val = amount_tendered if amount_tendered is not None else Decimal("0.00")
+    if amount_tendered is None:
+        amount_tendered = amount_due
+
+    if amount_tendered < amount_due:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Amount tendered (₱{tendered_val:.2f}) must be at least total due (₱{amount_due:.2f}).",
+            detail=f"Amount tendered (₱{amount_tendered:.2f}) must be at least total due (₱{amount_due:.2f}).",
         )
     change_due = amount_tendered - amount_due
     return amount_tendered, change_due
@@ -234,6 +237,16 @@ def process_customer_payment(
     except Exception as exc:
         logger.error(f"Failed to generate receipt PDF for order #{order.order_id}: {exc}")
 
+    # 9. Dispatch Customer Receipt & Pickup Code Email
+    if order.customer and order.customer.email:
+        try:
+            from app.shared.email_service import send_payment_receipt_email
+            send_payment_receipt_email(order, payment, order.customer.email, run_async=True)
+            payment.receipt_emailed_at = now
+        except Exception as exc:
+            payment.receipt_email_last_error = str(exc)
+            logger.error(f"Failed to dispatch receipt email for order #{order.order_id}: {exc}")
+
     database.commit()
     database.refresh(order)
     logger.info(f"Order #{order.order_id} successfully paid and confirmed. Pickup code: {pickup_code}")
@@ -286,6 +299,12 @@ def process_pay_at_counter(
             detail="This order reservation has expired. Please recreate it in POS.",
         )
 
+    # If cashier updated order items before payment, recalculate items & totals first
+    if payload.items:
+        from app.modules.orders.service import update_order_items_and_totals
+        update_order_items_and_totals(database, order, payload.items)
+        database.expire(order, ["order_items"])
+
     # Cash validation
     amount_tendered = None
     change_due = None
@@ -336,6 +355,16 @@ def process_pay_at_counter(
     except Exception as exc:
         logger.error(f"Failed to generate receipt PDF for counter order #{order.order_id}: {exc}")
 
+    # Dispatch Customer Receipt & Pickup Code Email
+    if order.customer and order.customer.email:
+        try:
+            from app.shared.email_service import send_payment_receipt_email
+            send_payment_receipt_email(order, payment, order.customer.email, run_async=True)
+            payment.receipt_emailed_at = now
+        except Exception as exc:
+            payment.receipt_email_last_error = str(exc)
+            logger.error(f"Failed to dispatch receipt email for counter order #{order.order_id}: {exc}")
+
     database.commit()
     database.refresh(order)
     return order
@@ -379,5 +408,15 @@ def create_pos_payment(
         payment.receipt_pdf_url = receipt_url
     except Exception as exc:
         logger.error(f"Failed to generate POS receipt PDF for order #{order.order_id}: {exc}")
+
+    # Dispatch Customer Receipt & Pickup Code Email if customer email is provided
+    if order.customer and order.customer.email:
+        try:
+            from app.shared.email_service import send_payment_receipt_email
+            send_payment_receipt_email(order, payment, order.customer.email, run_async=True)
+            payment.receipt_emailed_at = now
+        except Exception as exc:
+            payment.receipt_email_last_error = str(exc)
+            logger.error(f"Failed to dispatch POS receipt email for order #{order.order_id}: {exc}")
 
     return payment

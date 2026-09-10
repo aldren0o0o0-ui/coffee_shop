@@ -238,3 +238,71 @@ def test_expired_counter_order_rejection(client: TestClient, db: Session):
     db.refresh(order)
     assert order.order_status == OrderStatus.EXPIRED
     assert order.customer.no_show_count >= 1
+
+
+def test_counter_order_editing_before_payment_and_1_day_expiry(client: TestClient, db: Session):
+    menu_item_id, cashier_user = setup_counter_test_data(db)
+
+    # 1. Customer creates online order with pay_at_counter
+    unique_email = f"edit_test_{os.urandom(4).hex()}@coffeeshop.ph"
+    order_payload = {
+        "first_name": "Juan",
+        "last_name": "Dela Cruz",
+        "email": unique_email,
+        "order_type": "takeout",
+        "payment_method_intent": "pay_at_counter",
+        "items": [{"menu_item_id": menu_item_id, "quantity": 1, "addons": []}],
+    }
+    create_res = client.post("/api/v1/customer/orders", json=order_payload)
+    assert create_res.status_code == 201
+    created_data = create_res.json()
+    order_id = created_data["order_id"]
+    ref_code = created_data["reference_code"]
+
+    # 2. Verify 1-day (24-hour) expiration
+    order = db.get(Order, order_id)
+    assert order.order_status == OrderStatus.AWAITING_PAYMENT
+    assert order.expires_at is not None
+    time_diff = (order.expires_at - order.order_date).total_seconds()
+    assert 86000 <= time_diff <= 86500  # Approximately 24 hours (86,400s)
+
+    # 3. Cashier logs in
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "test_cashier_counter", "password": "CashierPassword123!"},
+    )
+    assert login_res.status_code == 200
+
+    # 4. Cashier looks up order by reference code
+    lookup_res = client.get(f"/api/v1/orders/counter-lookup?q={ref_code}")
+    assert lookup_res.status_code == 200
+    assert len(lookup_res.json()) >= 1
+    assert lookup_res.json()[0]["order_id"] == order_id
+
+    # 5. Cashier modifies order (increases quantity from 1 to 2) and pays with cash
+    updated_items = [{"menu_item_id": menu_item_id, "quantity": 2, "addons": []}]
+    pay_res = client.post(
+        f"/api/v1/orders/{order_id}/pay-at-counter",
+        json={
+            "payment_method": "cash",
+            "amount_tendered": 20.00,
+            "items": updated_items,
+        },
+    )
+    assert pay_res.status_code == 200
+    paid_data = pay_res.json()
+
+    # 6. Verify updated totals, pickup code, and status
+    assert paid_data["order_status"].lower() == "confirmed"
+    assert paid_data["pickup_code"] is not None
+    # 2 * 4.00 = 8.00 subtotal + 8% tax = 8.64
+    assert Decimal(str(paid_data["total_amount"])) == Decimal("8.64")
+    assert len(paid_data["items"]) == 1
+    assert paid_data["items"][0]["quantity"] == 2
+
+    # 7. Verify inventory deducted for 2 items
+    db.refresh(order)
+    inv_item = db.query(InventoryItem).filter(InventoryItem.item_name == "Counter Test Espresso Beans").first()
+    # 2 * 0.015 = 0.030 kg deducted
+    assert inv_item.quantity_on_hand == Decimal("50.000") - Decimal("0.030")
+

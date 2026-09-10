@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../auth/context/useAuth";
 import { fetchAllOrders, updateOrderStatus } from "../api/ordersApi";
 import OrderDetailsModal from "../components/OrderDetailsModal";
@@ -10,6 +10,9 @@ export default function DrinkPreparationPage() {
   const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
+
+  // Tab filter: "queue" (confirmed & preparing) | "ready" (waiting for customer pickup) | "all"
+  const [tabFilter, setTabFilter] = useState("all");
 
   // Polling state
   const [isPollingActive, setIsPollingActive] = useState(true);
@@ -33,9 +36,12 @@ export default function DrinkPreparationPage() {
 
     try {
       const all = await fetchAllOrders();
-      // Only show active queue orders: CONFIRMED and PREPARING
-      const queueOrders = all.filter((o) => ["CONFIRMED", "PREPARING"].includes(o.order_status));
-      setOrders(queueOrders);
+      // Show active orders: confirmed (newly paid), preparing (on bar), and ready (on pickup counter)
+      const activeOrders = (all || []).filter((o) => {
+        const status = (o.order_status || "").toLowerCase();
+        return ["confirmed", "preparing", "ready"].includes(status);
+      });
+      setOrders(activeOrders);
     } catch (err) {
       console.error("Failed to load queue:", err);
       setLoadError("Unable to connect to the drink preparation queue. Please check network connection.");
@@ -64,12 +70,14 @@ export default function DrinkPreparationPage() {
   async function handleAdvance(orderId, nextStatus) {
     setActionError("");
     try {
-      const updated = await updateOrderStatus(orderId, nextStatus);
-      setOrders((prev) =>
-        prev
-          .map((o) => (o.order_id === updated.order_id ? updated : o))
-          .filter((o) => ["CONFIRMED", "PREPARING"].includes(o.order_status))
-      );
+      const updated = await updateOrderStatus(orderId, nextStatus.toLowerCase());
+      setOrders((prev) => {
+        const updatedList = prev.map((o) => (o.order_id === updated.order_id ? updated : o));
+        return updatedList.filter((o) => {
+          const status = (o.order_status || "").toLowerCase();
+          return ["confirmed", "preparing", "ready"].includes(status);
+        });
+      });
     } catch (err) {
       setActionError(err.response?.data?.detail || "Failed to advance order status.");
     }
@@ -77,12 +85,28 @@ export default function DrinkPreparationPage() {
 
   // Elapsed time helper
   function getElapsedTime(orderDate) {
+    if (!orderDate) return "just now";
     const elapsedSec = Math.floor((Date.now() - new Date(orderDate).getTime()) / 1000);
     if (elapsedSec < 60) return `${elapsedSec}s ago`;
     const mins = Math.floor(elapsedSec / 60);
     const secs = elapsedSec % 60;
     return `${mins}m ${secs}s ago`;
   }
+
+  // Segment orders
+  const inPrepOrders = useMemo(() => {
+    return orders.filter((o) => ["confirmed", "preparing"].includes((o.order_status || "").toLowerCase()));
+  }, [orders]);
+
+  const readyOrders = useMemo(() => {
+    return orders.filter((o) => (o.order_status || "").toLowerCase() === "ready");
+  }, [orders]);
+
+  const displayedOrders = useMemo(() => {
+    if (tabFilter === "queue") return inPrepOrders;
+    if (tabFilter === "ready") return readyOrders;
+    return orders;
+  }, [orders, tabFilter, inPrepOrders, readyOrders]);
 
   return (
     <div className="space-y-6">
@@ -94,11 +118,11 @@ export default function DrinkPreparationPage() {
               ☕
             </span>
             <h1 className="text-xl font-black tracking-tight text-stone-900 sm:text-2xl">
-              Drink Preparation Queue
+              Drink Preparation Station
             </h1>
           </div>
           <p className="mt-1 text-xs text-stone-500 sm:text-sm">
-            Live barista workstation for newly confirmed tickets and drinks in progress.
+            Live barista workstation for brewing incoming tickets, dispatching orders, and managing customer pickups.
           </p>
         </div>
 
@@ -128,6 +152,75 @@ export default function DrinkPreparationPage() {
           </button>
         </div>
       </header>
+
+      {/* QUEUE & COUNTER SUMMARY CARDS / TABS */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <button
+          type="button"
+          onClick={() => setTabFilter("all")}
+          className={`flex items-center justify-between rounded-2xl border p-4 text-left transition shadow-xs ${
+            tabFilter === "all"
+              ? "border-amber-900 bg-amber-50/70 ring-2 ring-amber-400"
+              : "border-stone-200 bg-white hover:border-stone-300"
+          }`}
+        >
+          <div>
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-stone-500 block">
+              All Active Work
+            </span>
+            <span className="text-xl font-black text-stone-900 mt-0.5 block">
+              {orders.length} Tickets
+            </span>
+          </div>
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-stone-100 text-lg">
+            📋
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTabFilter("queue")}
+          className={`flex items-center justify-between rounded-2xl border p-4 text-left transition shadow-xs ${
+            tabFilter === "queue"
+              ? "border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-400"
+              : "border-stone-200 bg-white hover:border-stone-300"
+          }`}
+        >
+          <div>
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-700 block">
+              Brewing Queue
+            </span>
+            <span className="text-xl font-black text-stone-900 mt-0.5 block">
+              {inPrepOrders.length} In Progress
+            </span>
+          </div>
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-100 text-lg">
+            ☕
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTabFilter("ready")}
+          className={`flex items-center justify-between rounded-2xl border p-4 text-left transition shadow-xs ${
+            tabFilter === "ready"
+              ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-400"
+              : "border-stone-200 bg-white hover:border-stone-300"
+          }`}
+        >
+          <div>
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 block">
+              Ready on Counter
+            </span>
+            <span className="text-xl font-black text-emerald-950 mt-0.5 block">
+              {readyOrders.length} Ready for Pickup
+            </span>
+          </div>
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-lg">
+            🛎️
+          </span>
+        </button>
+      </div>
 
       {/* ERROR BANNER IF ACTION FAILED */}
       {actionError && (
@@ -183,18 +276,25 @@ export default function DrinkPreparationPage() {
             Retry Loading Queue
           </button>
         </div>
-      ) : orders.length > 0 ? (
-        /* STATE 2: POPULATED QUEUE */
+      ) : displayedOrders.length > 0 ? (
+        /* STATE 2: POPULATED TICKETS */
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {orders.map((order) => {
-            const isPreparing = order.order_status === "PREPARING";
+          {displayedOrders.map((order) => {
+            const status = (order.order_status || "").toLowerCase();
+            const isConfirmed = status === "confirmed";
+            const isPreparing = status === "preparing";
+            const isReady = status === "ready";
             const elapsed = getElapsedTime(order.order_date);
 
             return (
               <div
                 key={order.order_id}
                 className={`group relative flex flex-col justify-between rounded-3xl border bg-white p-6 shadow-xs transition hover:shadow-md ${
-                  isPreparing ? "border-indigo-300 ring-2 ring-indigo-500/20" : "border-stone-200"
+                  isReady
+                    ? "border-emerald-300 ring-2 ring-emerald-500/20 bg-emerald-50/10"
+                    : isPreparing
+                    ? "border-indigo-300 ring-2 ring-indigo-500/20"
+                    : "border-stone-200"
                 }`}
               >
                 <div>
@@ -205,30 +305,54 @@ export default function DrinkPreparationPage() {
                         #{order.order_id}
                       </span>
                       <div>
-                        <h3 className="font-extrabold text-stone-900 text-sm">
+                        <h3 className="font-extrabold text-stone-900 text-sm leading-tight">
                           {order.customer_name || "Guest"}
                         </h3>
-                        <span className="text-[10px] font-bold text-stone-400 uppercase">
-                          {order.order_type || "Takeout"}
-                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-bold text-stone-400 uppercase">
+                            {order.order_type || "Takeout"}
+                          </span>
+                          {order.pickup_code && (
+                            <span className="rounded-md bg-stone-100 px-1.5 py-0.2 text-[10px] font-black text-amber-950">
+                              🏷️ {order.pickup_code}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     <div className="text-right space-y-1">
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider block ${
-                          isPreparing
-                            ? "bg-indigo-100 text-indigo-900"
-                            : "bg-blue-100 text-blue-900"
+                          isReady
+                            ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                            : isPreparing
+                            ? "bg-indigo-100 text-indigo-900 border border-indigo-300"
+                            : "bg-blue-100 text-blue-900 border border-blue-300"
                         }`}
                       >
-                        {isPreparing ? "In Prep" : "Confirmed"}
+                        {isReady ? "Ready for Pickup" : isPreparing ? "In Prep" : "Confirmed"}
                       </span>
                       <span className="text-[10px] font-bold text-stone-400 block">
                         ⏱️ {elapsed}
                       </span>
                     </div>
                   </div>
+
+                  {/* PROMINENT READY ON COUNTER BANNER */}
+                  {isReady && (
+                    <div className="mt-3 rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-3 text-center space-y-0.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
+                        Customer Pickup Code
+                      </span>
+                      <span className="font-mono text-2xl font-black text-emerald-950 tracking-wider block">
+                        {order.pickup_code || `#${order.order_id}`}
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-700 block">
+                        Ready on counter for customer collection
+                      </span>
+                    </div>
+                  )}
 
                   {/* LINE ITEMS */}
                   <div className="my-4 divide-y divide-stone-100">
@@ -239,14 +363,14 @@ export default function DrinkPreparationPage() {
                             {item.quantity}x {item.item_name}
                           </span>
                           {item.size_name && (
-                            <span className="rounded-md bg-stone-100 px-1.5 py-0.2 text-[10px] text-stone-700">
+                            <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold text-stone-700">
                               {item.size_name}
                             </span>
                           )}
                         </div>
 
                         {item.addons && item.addons.length > 0 && (
-                          <div className="text-[11px] text-stone-500 pl-4">
+                          <div className="text-[11px] text-stone-500 pl-4 font-medium">
                             + {item.addons.map((a) => a.addon_name).join(", ")}
                           </div>
                         )}
@@ -266,26 +390,38 @@ export default function DrinkPreparationPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedOrder(order)}
-                    className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100"
+                    className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100 transition shadow-xs"
                   >
                     Inspect
                   </button>
 
-                  {!isPreparing ? (
+                  {isConfirmed && (
                     <button
                       type="button"
-                      onClick={() => handleAdvance(order.order_id, "PREPARING")}
-                      className="flex-1 rounded-xl bg-indigo-900 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-950 transition"
+                      onClick={() => handleAdvance(order.order_id, "preparing")}
+                      className="flex-1 rounded-xl bg-indigo-900 py-2.5 text-xs font-black text-white shadow-xs hover:bg-indigo-950 transition"
                     >
                       Start Prep ⏳
                     </button>
-                  ) : (
+                  )}
+
+                  {isPreparing && (
                     <button
                       type="button"
-                      onClick={() => handleAdvance(order.order_id, "READY")}
-                      className="flex-1 rounded-xl bg-emerald-700 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 transition"
+                      onClick={() => handleAdvance(order.order_id, "ready")}
+                      className="flex-1 rounded-xl bg-emerald-700 py-2.5 text-xs font-black text-white shadow-xs hover:bg-emerald-800 transition"
                     >
                       Mark Ready 🔔
+                    </button>
+                  )}
+
+                  {isReady && (
+                    <button
+                      type="button"
+                      onClick={() => handleAdvance(order.order_id, "completed")}
+                      className="flex-1 rounded-xl bg-stone-900 py-2.5 text-xs font-black text-white shadow-xs hover:bg-stone-800 transition"
+                    >
+                      ✓ Hand Off to Customer
                     </button>
                   )}
                 </div>
@@ -294,17 +430,32 @@ export default function DrinkPreparationPage() {
           })}
         </div>
       ) : (
-        /* STATE 3: EMPTY QUEUE */
+        /* STATE 3: EMPTY QUEUE VIEW */
         <div className="flex flex-col items-center justify-center rounded-3xl border border-stone-200 bg-white p-16 text-center shadow-xs space-y-3">
           <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-50 text-3xl">
-            ☕
+            {tabFilter === "ready" ? "🛎️" : "☕"}
           </div>
           <h3 className="text-base font-extrabold text-stone-900">
-            No drinks in the queue right now
+            {tabFilter === "ready"
+              ? "No orders waiting for pickup right now"
+              : tabFilter === "queue"
+              ? "No drinks currently brewing on bar"
+              : "No drinks in preparation station"}
           </h3>
           <p className="max-w-sm text-xs text-stone-500 leading-relaxed">
-            All confirmed customer and counter orders have been prepared. New tickets will appear here automatically in real time.
+            {tabFilter === "ready"
+              ? "Drinks marked ready will stay here with their pickup codes until handed off to the customer."
+              : "All paid customer and counter orders have been prepared. New tickets will appear automatically in real time."}
           </p>
+          {tabFilter !== "all" && (
+            <button
+              type="button"
+              onClick={() => setTabFilter("all")}
+              className="mt-2 text-xs font-bold text-amber-900 hover:underline"
+            >
+              View All Active Tickets ({orders.length})
+            </button>
+          )}
         </div>
       )}
 

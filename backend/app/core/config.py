@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     # Set SESSION_COOKIE_SECURE=true in production environment variables over HTTPS (SEC-6)
     session_cookie_secure: bool = False
 
+    # SMTP / Email Notification Settings
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = "orders@ldrncoffee.com"
+    smtp_from_name: str = "LDRN's Coffee Roastery"
+    smtp_tls: bool = True
+    smtp_ssl: bool = False
+
     @property
     def cors_origins(self) -> list[str]:
         raw_origins = [o.strip() for o in self.frontend_url.split(",") if o.strip()]

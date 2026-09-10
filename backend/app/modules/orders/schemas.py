@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.modules.orders.models import OrderChannel, OrderStatus, OrderType
 from app.modules.payments.models import PaymentMethod
@@ -39,6 +39,11 @@ class POSOrderCreateRequest(BaseModel):
     payment_method: PaymentMethod = PaymentMethod.CASH
     amount_tendered: Decimal | None = None
     items: list[OrderItemCreate] = Field(min_length=1)
+
+
+class PendingOrderUpdateRequest(BaseModel):
+    items: list[OrderItemCreate] = Field(min_length=1)
+    order_type: OrderType | None = None
 
 
 class OrderTrackingRequest(BaseModel):
@@ -110,3 +115,10 @@ class OrderTrackingResponse(BaseModel):
 
 class OrderStatusUpdateRequest(BaseModel):
     status: OrderStatus
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def normalize_status(cls, value: str | OrderStatus) -> str | OrderStatus:
+        if isinstance(value, str):
+            return value.lower()
+        return value

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { trackCustomerOrder } from "../api/ordersApi";
+import { downloadReceipt, printReceipt } from "../utils/receiptUtils";
 
 export default function CustomerTrackingPage() {
   const [searchParams] = useSearchParams();
@@ -36,6 +37,8 @@ export default function CustomerTrackingPage() {
     } catch (err) {
       if (err.response?.status === 404) {
         setErrorMessage("We couldn't find that order — please check your order number and email address.");
+      } else if (err.response?.status === 429) {
+        setErrorMessage("Tracking limit reached temporarily. Please wait a moment before trying again.");
       } else {
         setErrorMessage("Unable to retrieve order details. Please check your network and try again.");
       }
@@ -56,6 +59,36 @@ export default function CustomerTrackingPage() {
     ready: "Ready for Pickup",
     completed: "Picked Up",
   };
+
+  // Standard live tracking polling with exponential backoff on 429 / network errors
+  useEffect(() => {
+    if (!trackingResult || !orderId || !email.trim()) return;
+    if (["completed", "cancelled", "expired"].includes(trackingResult.order_status)) return;
+
+    let backoffMs = 15000; // 15s industry standard interval
+    let timeoutId;
+
+    async function pollLiveStatus() {
+      try {
+        const refreshed = await trackCustomerOrder(orderId, email.trim());
+        setTrackingResult(refreshed);
+        backoffMs = 15000; // Reset to standard on success
+      } catch (err) {
+        if (err.response?.status === 429) {
+          // If rate limited, back off politely (30s -> 60s)
+          backoffMs = Math.min(backoffMs * 2, 60000);
+          console.warn(`Tracking rate limit hit; backing off to ${backoffMs / 1000}s`);
+        } else {
+          console.error("Live track poll error:", err);
+        }
+      } finally {
+        timeoutId = setTimeout(pollLiveStatus, backoffMs);
+      }
+    }
+
+    timeoutId = setTimeout(pollLiveStatus, backoffMs);
+    return () => clearTimeout(timeoutId);
+  }, [trackingResult?.order_status, orderId, email]);
 
   return (
     <div className="min-h-screen bg-stone-100 font-sans text-stone-900">
@@ -138,14 +171,19 @@ export default function CustomerTrackingPage() {
             <div className="mt-8 space-y-6 border-t border-stone-100 pt-6">
               <div className="flex flex-col justify-between gap-4 rounded-2xl bg-amber-50/70 p-5 sm:flex-row sm:items-center">
                 <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-900">
-                    Order #{trackingResult.order_id}
-                  </span>
-                  <h2 className="text-xl font-black text-stone-900">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-900">
+                      Order #{trackingResult.order_id}
+                    </span>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black uppercase text-amber-950">
+                      {trackingResult.order_status?.replace("_", " ")}
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-black text-stone-900 mt-1">
                     {trackingResult.customer_name}
                   </h2>
                   <p className="text-xs text-stone-500">
-                    Total: ${Number(trackingResult.total_amount).toFixed(2)} • {trackingResult.order_type}
+                    Total: ₱{Number(trackingResult.total_amount).toFixed(2)} • {trackingResult.order_type}
                   </p>
                 </div>
 
@@ -157,35 +195,72 @@ export default function CustomerTrackingPage() {
                     </p>
                   </div>
                 )}
+
+                {trackingResult.reference_code && trackingResult.order_status === "awaiting_payment" && (
+                  <div className="rounded-xl border-2 border-amber-600 bg-white p-3 text-center">
+                    <span className="text-[10px] font-bold text-amber-900 uppercase">Counter Reference Code</span>
+                    <p className="text-2xl font-black tracking-widest text-amber-950">
+                      {trackingResult.reference_code}
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {/* Pay at Counter pending notice */}
+              {trackingResult.order_status === "awaiting_payment" && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-950 space-y-1">
+                  <span className="font-extrabold flex items-center gap-1.5 text-amber-900">
+                    <span>🏪</span> Awaiting Payment at Counter
+                  </span>
+                  <p className="text-amber-900/90">
+                    Please present your Reference Code <strong>{trackingResult.reference_code}</strong> to the store cashier.
+                    Your coffee will be freshly prepared as soon as payment is completed.
+                  </p>
+                </div>
+              )}
+
+              {/* Ready for Pickup notice */}
+              {trackingResult.order_status === "ready" && (
+                <div className="rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-4 text-emerald-950 shadow-sm space-y-1 animate-in fade-in">
+                  <div className="flex items-center gap-2 text-sm font-black text-emerald-900">
+                    <span className="text-lg">🔔</span>
+                    <span>Your Order is Freshly Brewed &amp; Ready for Pick Up!</span>
+                  </div>
+                  <p className="text-xs text-emerald-800">
+                    Please proceed to the pickup counter and present your Pickup Code <strong>{trackingResult.pickup_code}</strong> to the barista.
+                  </p>
+                </div>
+              )}
 
               {/* Status progression meter */}
-              <div>
-                <div className="flex items-center justify-between text-xs font-bold">
-                  {steps.map((st, i) => {
-                    const currentIdx = steps.indexOf(trackingResult.order_status);
-                    const isPassed = currentIdx >= i;
-                    const isCurrent = trackingResult.order_status === st;
+              {trackingResult.order_status !== "awaiting_payment" && !["cancelled", "expired"].includes(trackingResult.order_status) && (
+                <div>
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    {steps.map((st, i) => {
+                      const currentIdx = steps.indexOf(trackingResult.order_status);
+                      const isPassed = currentIdx >= i;
+                      const isCurrent = trackingResult.order_status === st;
 
-                    return (
-                      <div className="flex flex-col items-center gap-1.5 text-center" key={st}>
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
-                          isCurrent
-                            ? "bg-amber-900 text-white ring-4 ring-amber-200"
-                            : isPassed
-                            ? "bg-emerald-600 text-white"
-                            : "bg-stone-200 text-stone-500"
-                        }`}>
-                          {isPassed && !isCurrent ? "✓" : i + 1}
+                      return (
+                        <div className="flex flex-col items-center gap-1.5 text-center" key={st}>
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                            isCurrent
+                              ? "bg-amber-900 text-white ring-4 ring-amber-200"
+                              : isPassed
+                              ? "bg-emerald-600 text-white"
+                              : "bg-stone-200 text-stone-500"
+                          }`}>
+                            {isPassed && !isCurrent ? "✓" : i + 1}
+                          </div>
+                          <span className={`text-[10px] sm:text-xs ${isCurrent ? "text-amber-950 font-black" : "text-stone-500"}`}>
+                            {stepLabels[st]}
+                          </span>
                         </div>
-                        <span className={`text-[10px] sm:text-xs ${isCurrent ? "text-amber-950 font-black" : "text-stone-500"}`}>
-                          {stepLabels[st]}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Items breakdown */}
               <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -199,6 +274,32 @@ export default function CustomerTrackingPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Official Customer Receipt */}
+              {trackingResult.receipt_pdf_url && (
+                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div>
+                    <span className="font-bold text-stone-900 block">Official Customer Receipt</span>
+                    <span className="text-[11px] text-stone-500">View or download your official thermal receipt</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => printReceipt(trackingResult.receipt_pdf_url)}
+                      className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 font-bold text-stone-800 hover:bg-stone-100 transition shadow-xs"
+                    >
+                      🖨️ Print
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadReceipt(trackingResult.receipt_pdf_url, trackingResult.order_id)}
+                      className="rounded-xl bg-amber-900 px-3.5 py-1.5 font-bold text-white hover:bg-amber-950 transition shadow-xs"
+                    >
+                      ⬇️ Download PDF
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

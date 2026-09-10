@@ -1,0 +1,102 @@
+Here are the sample Stock & Ingredients and Menu Items with their complete recipe links, sizes, add-ons, and pricing in Philippine Pesos (₱):
+
+Part 1: Sample Raw Ingredients to Add
+Go to Stock & Ingredients (http://localhost:5173/inventory) and click + Add Ingredient / Stock Item:
+
+Ingredient Name	Unit of Measure	Initial Stock	Unit Cost (₱)	Reorder Alert Level	Usage / Notes
+Espresso Roast Whole Beans	kg	15.000	₱850.00	3.000	Base espresso extraction for all coffee
+Farm Fresh Whole Milk	L	35.000	₱95.00	5.000	Lattes, Flat Whites, Cappuccinos
+Barista Oat Milk	L	20.000	₱175.00	4.000	Plant-based dairy-free milk alternative
+Madagascar Vanilla Syrup	L	5.000	₱480.00	1.000	Flavored lattes & sweetness modifier
+Salted Caramel Sauce	L	4.000	₱520.00	1.000	Macchiatos, cold foams & cup drizzles
+Ceremonial Matcha Powder	kg	2.000	₱1,200.00	0.500	Handcrafted Matcha Lattes
+Single-Origin Dark Cocoa	kg	5.000	₱650.00	1.000	Mochas & artisan hot chocolate
+12oz Biodegradable Hot Cups	pcs	300.000	₱6.50	50.000	Hot coffee takeout packaging
+16oz Recyclable Cold Cups & Lids	pcs	300.000	₱7.20	50.000	Iced coffee & cold brew packaging
+Part 2: Recommended Menu Categories
+When creating menu items in Menu Management (http://localhost:5173/menu), you can organize them into:
+
+Espresso & Classic Coffee
+Specialty Lattes & Signatures
+Cold Brew & Refreshers
+Non-Coffee & Artisan Teas
+Part 3: Sample Menu Items & Recipe Linking Specifications
+1. Artisan Flat White
+Category: Espresso & Classic Coffee
+Description: "Double shot of rich espresso combined with silky, expertly steamed whole milk micro-foam."
+Base Price: ₱150.00
+Sizes:
+Regular 8oz (+₱0.00, Default)
+Large 12oz (+₱30.00)
+Add-ons & Modifiers:
+Extra Espresso Shot (+₱35.00)
+Substitute Barista Oat Milk (+₱40.00)
+Madagascar Vanilla Pump (+₱25.00)
+Recipe Linking (Step 5):
+Espresso Roast Whole Beans: 0.018 kg (18g double shot)
+Farm Fresh Whole Milk: 0.180 L (180ml steamed milk)
+12oz Biodegradable Hot Cups: 1.000 pcs
+2. Spanish Iced Latte
+Category: Specialty Lattes & Signatures
+Description: "Bold espresso poured over textured fresh milk and sweetened condensed milk for a creamy, caramelized finish."
+Base Price: ₱165.00
+Sizes:
+12oz Hot (+₱0.00)
+16oz Iced (+₱25.00, Default)
+Add-ons & Modifiers:
+Extra Espresso Shot (+₱35.00)
+Substitute Barista Oat Milk (+₱40.00)
+Salted Caramel Drizzle (+₱30.00)
+Recipe Linking (Step 5):
+Espresso Roast Whole Beans: 0.018 kg (18g double shot)
+Farm Fresh Whole Milk: 0.160 L (160ml milk)
+16oz Recyclable Cold Cups & Lids: 1.000 pcs
+3. Sea Salt Caramel Cold Brew
+Category: Cold Brew & Refreshers
+Description: "18-hour slow-steeped single-origin cold brew topped with handcrafted sea salt caramel cream cold foam."
+Base Price: ₱175.00
+Sizes:
+16oz Regular (+₱0.00, Default)
+20oz Grande (+₱35.00)
+Add-ons & Modifiers:
+Extra Salted Caramel Cold Foam (+₱40.00)
+Vanilla Syrup Pump (+₱25.00)
+Recipe Linking (Step 5):
+Espresso Roast Whole Beans: 0.025 kg (25g equivalent)
+Salted Caramel Sauce: 0.025 L (25ml)
+16oz Recyclable Cold Cups & Lids: 1.000 pcs
+4. Uji Ceremonial Matcha Latte
+Category: Non-Coffee & Artisan Teas
+Description: "Premium Japanese ceremonial grade matcha freshly whisked with velvety steamed or iced milk."
+Base Price: ₱180.00
+Sizes:
+12oz Hot (+₱0.00)
+16oz Iced (+₱25.00, Default)
+Add-ons & Modifiers:
+Substitute Barista Oat Milk (+₱40.00)
+Vanilla Syrup Pump (+₱25.00)
+Recipe Linking (Step 5):
+Ceremonial Matcha Powder: 0.006 kg (6g matcha)
+Farm Fresh Whole Milk: 0.200 L (200ml milk)
+16oz Recyclable Cold Cups & Lids: 1.000 pcs
+5. Dark Chocolate Mocha
+Category: Espresso & Classic Coffee
+Description: "Rich double espresso blended with melted single-origin dark cocoa and velvety steamed whole milk."
+Base Price: ₱170.00
+Sizes:
+12oz Hot (+₱0.00, Default)
+16oz Iced (+₱25.00)
+Add-ons & Modifiers:
+Extra Espresso Shot (+₱35.00)
+Whipped Cream (+₱25.00)
+Recipe Linking (Step 5):
+Espresso Roast Whole Beans: 0.018 kg
+Farm Fresh Whole Milk: 0.180 L
+Single-Origin Dark Cocoa: 0.020 kg
+12oz Biodegradable Hot Cups: 1.000 pcs
+How Everything Connects Automatically
+Inventory Deduction: Whenever an order is paid (online or at the POS counter), the exact recipe quantities (kg, L, pcs) are atomically deducted from current stock.
+Browse Page Transparency: On the customer browse page (http://localhost:5173/browse), customers automatically see:
+Fresh Ingredients: Espresso Roast Whole Beans • Farm Fresh Whole Milk • 12oz Biodegradable Hot Cups
+
+Low Stock Warnings: If stock falls below the Reorder Alert Level, the system alerts the manager and automatically prevents checkout if an ingredient reaches zero.

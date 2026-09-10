@@ -1,15 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../auth/context/useAuth";
 import { fetchAllOrders, updateOrderStatus } from "../api/ordersApi";
 import OrderDetailsModal from "../components/OrderDetailsModal";
 
 const STATE_BADGES = {
+  awaiting_payment: "bg-amber-100 text-amber-900 border-amber-300",
   AWAITING_PAYMENT: "bg-amber-100 text-amber-900 border-amber-300",
+  confirmed: "bg-blue-100 text-blue-900 border-blue-300",
   CONFIRMED: "bg-blue-100 text-blue-900 border-blue-300",
+  preparing: "bg-indigo-100 text-indigo-900 border-indigo-300",
   PREPARING: "bg-indigo-100 text-indigo-900 border-indigo-300",
+  ready: "bg-emerald-100 text-emerald-900 border-emerald-300",
   READY: "bg-emerald-100 text-emerald-900 border-emerald-300",
+  completed: "bg-stone-100 text-stone-700 border-stone-300",
   COMPLETED: "bg-stone-100 text-stone-700 border-stone-300",
+  cancelled: "bg-rose-100 text-rose-800 border-rose-300",
   CANCELLED: "bg-rose-100 text-rose-800 border-rose-300",
+  expired: "bg-stone-200 text-stone-600 border-stone-300",
   EXPIRED: "bg-stone-200 text-stone-600 border-stone-300",
 };
 
@@ -56,17 +64,19 @@ export default function OrdersPage() {
     const q = searchQuery.trim().toLowerCase();
     return orders.filter((o) => {
       let matchesStatus = true;
+      const statusLower = (o.order_status || "").toLowerCase();
       if (statusFilter === "active") {
-        matchesStatus = ["AWAITING_PAYMENT", "CONFIRMED", "PREPARING", "READY"].includes(o.order_status);
+        matchesStatus = ["awaiting_payment", "confirmed", "preparing", "ready"].includes(statusLower);
       } else if (statusFilter !== "all") {
-        matchesStatus = o.order_status.toLowerCase() === statusFilter.toLowerCase();
+        matchesStatus = statusLower === statusFilter.toLowerCase();
       }
 
       const matchesSearch =
         !q ||
         o.order_id.toString().includes(q) ||
         (o.customer_name && o.customer_name.toLowerCase().includes(q)) ||
-        (o.pickup_code && o.pickup_code.toLowerCase().includes(q));
+        (o.pickup_code && o.pickup_code.toLowerCase().includes(q)) ||
+        (o.reference_code && o.reference_code.toLowerCase().includes(q));
 
       return matchesStatus && matchesSearch;
     });
@@ -191,7 +201,7 @@ export default function OrdersPage() {
                   <th className="pb-3">Customer</th>
                   <th className="pb-3">Channel / Type</th>
                   <th className="pb-3">Items Summary</th>
-                  <th className="pb-3">Pickup Code</th>
+                  <th className="pb-3">Code (Pickup / Ref)</th>
                   <th className="pb-3">Total</th>
                   <th className="pb-3">Status</th>
                   <th className="pb-3 text-right">Actions</th>
@@ -199,7 +209,9 @@ export default function OrdersPage() {
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {filteredOrders.map((order) => {
-                  const isReady = order.order_status === "READY";
+                  const statusLower = (order.order_status || "").toLowerCase();
+                  const isReady = statusLower === "ready";
+                  const isAwaiting = statusLower === "awaiting_payment";
                   return (
                     <tr
                       key={order.order_id}
@@ -229,12 +241,24 @@ export default function OrdersPage() {
                         {order.items?.map((i) => `${i.quantity}x ${i.item_name}`).join(", ")}
                       </td>
 
-                      <td className="py-4 font-black tracking-widest text-amber-950">
-                        {order.pickup_code || "—"}
+                      <td className="py-4 font-black text-amber-950">
+                        {order.pickup_code ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">Pickup</span>
+                            <span className="tracking-wider font-black text-xs">{order.pickup_code}</span>
+                          </div>
+                        ) : order.reference_code ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded">Ref</span>
+                            <span className="tracking-wider font-black text-xs text-amber-950">{order.reference_code}</span>
+                          </div>
+                        ) : (
+                          <span className="text-stone-300">—</span>
+                        )}
                       </td>
 
                       <td className="py-4 font-extrabold text-stone-900">
-                        ${Number(order.total_amount).toFixed(2)}
+                        ₱{Number(order.total_amount).toFixed(2)}
                       </td>
 
                       <td className="py-4">
@@ -255,6 +279,16 @@ export default function OrdersPage() {
                         >
                           Inspect
                         </button>
+
+                        {isAwaiting && isCashierOrManager && (
+                          <Link
+                            to={`/pos?mode=lookup&ref=${encodeURIComponent(order.reference_code || order.order_id)}`}
+                            state={{ activeMode: "lookup", orderId: order.order_id, referenceCode: order.reference_code }}
+                            className="rounded-xl bg-amber-900 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-950 transition inline-block"
+                          >
+                            Charge in POS 💳
+                          </Link>
+                        )}
 
                         {isReady && isCashierOrManager && (
                           <button

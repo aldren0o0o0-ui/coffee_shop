@@ -1,15 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { fetchMenuCatalog } from "../../menu/api/menuApi";
 import {
   createPosOrder,
   lookupPendingCounterOrders,
   payPendingCounterOrder,
 } from "../api/ordersApi";
+import { downloadReceipt, printReceipt } from "../utils/receiptUtils";
 import { getImageUrl } from "../../menu/utils/image";
 
 export default function PosPage() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
   // Mode: "register" | "lookup"
-  const [activeMode, setActiveMode] = useState("register");
+  const [activeMode, setActiveMode] = useState(() => {
+    const qMode = new URLSearchParams(window.location.search).get("mode");
+    return qMode === "lookup" ? "lookup" : "register";
+  });
 
   // Menu Catalog State
   const [catalog, setCatalog] = useState([]);
@@ -27,6 +35,7 @@ export default function PosPage() {
   const [orderType, setOrderType] = useState("dine_in");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [amountTendered, setAmountTendered] = useState("");
+  const [editingPendingOrder, setEditingPendingOrder] = useState(null);
 
   // Customization drawer/modal for selected item
   const [customizingItem, setCustomizingItem] = useState(null);
@@ -45,6 +54,9 @@ export default function PosPage() {
   const [lookupResults, setLookupResults] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedPendingOrder, setSelectedPendingOrder] = useState(null);
+  const [pendingItems, setPendingItems] = useState([]);
+  const [showAddDrinkDropdown, setShowAddDrinkDropdown] = useState(false);
+  const [addDrinkSearch, setAddDrinkSearch] = useState("");
   const [counterPaymentMethod, setCounterPaymentMethod] = useState("cash");
   const [counterAmountTendered, setCounterAmountTendered] = useState("");
   const [lookupError, setLookupError] = useState("");
@@ -123,7 +135,11 @@ export default function PosPage() {
       quantity: 1,
     };
 
-    setCart((prev) => [...prev, cartEntry]);
+    if (activeMode === "lookup" && selectedPendingOrder) {
+      setPendingItems((prev) => [...prev, cartEntry]);
+    } else {
+      setCart((prev) => [...prev, cartEntry]);
+    }
     setCustomizingItem(null);
   }
 
@@ -153,6 +169,11 @@ export default function PosPage() {
   const numericTendered = parseFloat(amountTendered) || 0;
   const registerChangeDue = numericTendered >= total ? numericTendered - total : 0;
 
+  function handleEditPendingOrderInRegister(order) {
+    if (!order) return;
+    handleSelectPendingOrder(order);
+  }
+
   // Submit POS Order
   async function handleCheckout(e) {
     e.preventDefault();
@@ -167,24 +188,44 @@ export default function PosPage() {
     setPosError("");
 
     try {
-      const payload = {
-        customer_name: customerName.trim() || "Walk-in Guest",
-        customer_email: customerEmail.trim() || null,
-        order_type: orderType,
-        payment_method: paymentMethod,
-        amount_tendered: paymentMethod === "cash" ? numericTendered : null,
-        items: cart.map((c) => ({
+      const itemsPayload = cart.map((c) => {
+        const addonIds = c.addon_ids || (c.addons || []).map((a) => a.addon_id || a.menu_item_addon_id).filter(Boolean);
+        return {
           menu_item_id: c.menu_item_id,
           menu_item_size_id: c.menu_item_size_id,
           quantity: c.quantity,
-          addon_ids: c.addon_ids,
+          addon_ids: addonIds,
+          addons: addonIds.map((id) => ({
+            menu_item_addon_id: id,
+            quantity: 1,
+          })),
           special_instructions: c.special_instructions,
-        })),
-      };
+        };
+      });
 
-      const result = await createPosOrder(payload);
+      let result;
+      if (editingPendingOrder) {
+        const payload = {
+          payment_method: paymentMethod,
+          amount_tendered: paymentMethod === "cash" ? numericTendered : null,
+          items: itemsPayload,
+        };
+        result = await payPendingCounterOrder(editingPendingOrder.order_id, payload);
+      } else {
+        const payload = {
+          customer_name: customerName.trim() || "Walk-in Guest",
+          customer_email: customerEmail.trim() || null,
+          order_type: orderType,
+          payment_method: paymentMethod,
+          amount_tendered: paymentMethod === "cash" ? numericTendered : null,
+          items: itemsPayload,
+        };
+        result = await createPosOrder(payload);
+      }
+
       setConfirmedReceipt(result);
       setCart([]);
+      setEditingPendingOrder(null);
       setCustomerName("Walk-in Guest");
       setCustomerEmail("");
       setAmountTendered("");
@@ -201,46 +242,169 @@ export default function PosPage() {
     }
   }
 
-  // --- LOOKUP ACTIONS ---
-  async function handleLookupSearch(e) {
-    if (e) e.preventDefault();
-    if (!lookupQuery.trim()) return;
+  // --- PENDING ORDER EDITING & LOOKUP ACTIONS ---
+  function updatePendingItemQuantity(cartId, delta) {
+    setPendingItems((prev) =>
+      prev
+        .map((item) => {
+          if (item.cart_id === cartId) {
+            const newQty = item.quantity + delta;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean)
+    );
+  }
 
+  function removePendingItem(cartId) {
+    setPendingItems((prev) => prev.filter((item) => item.cart_id !== cartId));
+  }
+
+  const pendingSubtotal = useMemo(() => {
+    return pendingItems.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
+  }, [pendingItems]);
+
+  const pendingTax = pendingSubtotal * 0.08;
+  const pendingTotal = pendingSubtotal + pendingTax;
+
+  const counterNumericTendered = counterAmountTendered !== ""
+    ? (parseFloat(counterAmountTendered) || 0)
+    : pendingTotal;
+  const counterChangeDue = counterNumericTendered >= pendingTotal ? counterNumericTendered - pendingTotal : 0;
+
+  // Automatically synchronize cash amount tendered to match pendingTotal
+  useEffect(() => {
+    if (selectedPendingOrder && pendingTotal > 0) {
+      setCounterAmountTendered((prev) => {
+        if (!prev) return pendingTotal.toFixed(2);
+        const val = parseFloat(prev);
+        if (isNaN(val) || val < pendingTotal) {
+          return pendingTotal.toFixed(2);
+        }
+        return prev;
+      });
+    }
+  }, [selectedPendingOrder?.order_id, pendingTotal]);
+
+  function handleSelectPendingOrder(order) {
+    if (!order) {
+      setSelectedPendingOrder(null);
+      setPendingItems([]);
+      setCounterAmountTendered("");
+      return;
+    }
+    setSelectedPendingOrder(order);
+    const mapped = (order.items || []).map((it) => {
+      const addons = it.addons || [];
+      return {
+        order_item_id: it.order_item_id,
+        cart_id: `pending-${it.order_item_id || it.menu_item_id}-${Date.now()}-${Math.random()}`,
+        menu_item_id: it.menu_item_id,
+        item_name: it.item_name,
+        menu_item_size_id: it.menu_item_size_id || null,
+        size_name: it.size_name || null,
+        addon_ids: addons.map((a) => a.addon_id || a.menu_item_addon_id).filter(Boolean),
+        addons: addons,
+        special_instructions: it.special_instructions || null,
+        unit_price: Number(it.unit_price),
+        quantity: it.quantity,
+      };
+    });
+    setPendingItems(mapped);
+    setShowAddDrinkDropdown(false);
+    setAddDrinkSearch("");
+    const sub = mapped.reduce((acc, it) => acc + it.unit_price * it.quantity, 0);
+    const tot = sub + sub * 0.08;
+    setCounterAmountTendered(tot.toFixed(2));
+  }
+
+  async function loadPendingOrders(query = "", autoSelectRef = "") {
     setIsSearchingLookup(true);
     setLookupError("");
-    setSelectedPendingOrder(null);
-    setHasSearched(true);
-
     try {
-      const results = await lookupPendingCounterOrders(lookupQuery.trim());
+      const results = await lookupPendingCounterOrders(query);
       setLookupResults(results);
-      if (results.length === 1) {
-        setSelectedPendingOrder(results[0]);
-        setCounterAmountTendered(Number(results[0].total_amount).toFixed(2));
+      setHasSearched(true);
+
+      const targetRef = autoSelectRef || query;
+      if (targetRef) {
+        const cleanRef = targetRef.trim().toLowerCase();
+        const matched = results.find(
+          (o) =>
+            (o.reference_code || "").toLowerCase() === cleanRef ||
+            `ref-${o.order_id}`.toLowerCase() === cleanRef ||
+            o.order_id.toString() === cleanRef
+        );
+        if (matched) {
+          handleSelectPendingOrder(matched);
+        } else if (results.length > 0 && !selectedPendingOrder) {
+          handleSelectPendingOrder(results[0]);
+        }
+      } else if (results.length > 0 && !selectedPendingOrder) {
+        handleSelectPendingOrder(results[0]);
+      } else if (selectedPendingOrder) {
+        const stillPresent = results.find((o) => o.order_id === selectedPendingOrder.order_id);
+        if (!stillPresent && results.length > 0) {
+          handleSelectPendingOrder(results[0]);
+        } else if (!stillPresent) {
+          setSelectedPendingOrder(null);
+          setPendingItems([]);
+        }
       }
     } catch {
-      setLookupError("Unable to search pending counter orders. Please check your connection.");
+      setLookupError("Unable to load pending counter orders. Please check your connection.");
     } finally {
       setIsSearchingLookup(false);
     }
   }
 
-  function handleSelectPendingOrder(order) {
-    setSelectedPendingOrder(order);
-    setCounterAmountTendered(Number(order.total_amount).toFixed(2));
+  async function handleLookupSearch(e) {
+    if (e) e.preventDefault();
+    loadPendingOrders(lookupQuery.trim());
   }
 
-  // Change Calculation for Counter Order
-  const counterTotal = selectedPendingOrder ? Number(selectedPendingOrder.total_amount) : 0;
-  const counterNumericTendered = parseFloat(counterAmountTendered) || 0;
-  const counterChangeDue = counterNumericTendered >= counterTotal ? counterNumericTendered - counterTotal : 0;
+  useEffect(() => {
+    loadPendingOrders("");
+  }, []);
+
+  useEffect(() => {
+    if (activeMode === "lookup") {
+      loadPendingOrders(lookupQuery);
+    }
+  }, [activeMode]);
+
+  useEffect(() => {
+    const qMode = searchParams.get("mode") || location.state?.activeMode;
+    const qRef = searchParams.get("ref") || location.state?.referenceCode;
+    if (qMode === "lookup") {
+      setActiveMode("lookup");
+      if (qRef) {
+        setLookupQuery(qRef);
+        // Load all pending orders so the cashier sees the full list, and auto-select the targeted ref
+        loadPendingOrders("", qRef);
+      } else {
+        loadPendingOrders("");
+      }
+    }
+  }, [location.key, location.state, searchParams]);
 
   async function handleConfirmCounterPayment(e) {
     e.preventDefault();
     if (!selectedPendingOrder) return;
 
-    if (counterPaymentMethod === "cash" && counterNumericTendered < counterTotal) {
-      setLookupError(`Amount tendered (₱${counterNumericTendered.toFixed(2)}) must be at least total due (₱${counterTotal.toFixed(2)}).`);
+    if (pendingItems.length === 0) {
+      setLookupError("Cannot tender payment: The order must contain at least one item.");
+      return;
+    }
+
+    const effectiveTendered = counterPaymentMethod === "cash"
+      ? (counterAmountTendered !== "" ? parseFloat(counterAmountTendered) : pendingTotal)
+      : null;
+
+    if (counterPaymentMethod === "cash" && (effectiveTendered === null || isNaN(effectiveTendered) || effectiveTendered < pendingTotal)) {
+      const displayVal = effectiveTendered !== null && !isNaN(effectiveTendered) ? effectiveTendered : 0;
+      setLookupError(`Amount tendered (₱${displayVal.toFixed(2)}) must be at least total due (₱${pendingTotal.toFixed(2)}).`);
       return;
     }
 
@@ -248,17 +412,33 @@ export default function PosPage() {
     setLookupError("");
 
     try {
+      const itemsPayload = pendingItems.map((c) => {
+        const addonIds = c.addon_ids || (c.addons || []).map((a) => a.addon_id || a.menu_item_addon_id).filter(Boolean);
+        return {
+          menu_item_id: c.menu_item_id,
+          menu_item_size_id: c.menu_item_size_id,
+          quantity: c.quantity,
+          addon_ids: addonIds,
+          addons: addonIds.map((id) => ({
+            menu_item_addon_id: id,
+            quantity: 1,
+          })),
+          special_instructions: c.special_instructions,
+        };
+      });
+
       const payload = {
         payment_method: counterPaymentMethod,
-        amount_tendered: counterPaymentMethod === "cash" ? counterNumericTendered : null,
+        amount_tendered: effectiveTendered,
+        items: itemsPayload,
       };
 
       const result = await payPendingCounterOrder(selectedPendingOrder.order_id, payload);
       setConfirmedReceipt(result);
       setSelectedPendingOrder(null);
-      setLookupResults([]);
-      setLookupQuery("");
-      setHasSearched(false);
+      setPendingItems([]);
+      setCounterAmountTendered("");
+      loadPendingOrders("");
     } catch (err) {
       setLookupError(err.response?.data?.detail || "Failed to confirm payment for counter order.");
     } finally {
@@ -317,36 +497,84 @@ export default function PosPage() {
       {/* ========================================================================= */}
       {activeMode === "lookup" && (
         <div className="space-y-6 animate-in fade-in duration-150">
-          {/* SEARCH BAR */}
+          {/* SEARCH & FILTER BAR */}
           <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs space-y-4">
-            <div>
-              <h2 className="text-base font-black text-stone-900">
-                Retrieve &amp; Charge Pay-at-Counter Order
-              </h2>
-              <p className="text-xs text-stone-500">
-                Enter the customer&apos;s 4-digit Reference Code (e.g. <strong>REF-4821</strong> or <strong>4821</strong>), or search by customer name / email.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
+                  <span>Pending Pay-at-Counter Orders</span>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900 border border-amber-300">
+                    {lookupResults.length} active
+                  </span>
+                </h2>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  All active pending counter orders are displayed automatically below. Select any order to edit quantities, add menu items, or tender payment.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLookupQuery("");
+                    loadPendingOrders("");
+                  }}
+                  className="flex items-center gap-1.5 rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100 transition shadow-2xs"
+                  title="Reload all pending orders"
+                >
+                  <span>🔄 Refresh List</span>
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleLookupSearch} className="flex gap-2 max-w-xl">
+            <form onSubmit={handleLookupSearch} className="flex flex-col sm:flex-row gap-2 max-w-2xl">
               <div className="relative flex-1">
                 <input
                   type="text"
-                  required
                   value={lookupQuery}
-                  onChange={(e) => setLookupQuery(e.target.value)}
-                  placeholder="Enter Reference Code (e.g. REF-4821) or email..."
-                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 py-3 pl-10 pr-4 text-xs font-bold text-stone-900 placeholder:text-stone-400 focus:border-amber-900 focus:bg-white focus:outline-none"
+                  onChange={(e) => {
+                    setLookupQuery(e.target.value);
+                    if (!e.target.value.trim()) {
+                      loadPendingOrders("");
+                    }
+                  }}
+                  placeholder="Filter by Reference Code (e.g. REF-4821), customer name, or email..."
+                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 py-3 pl-10 pr-10 text-xs font-bold text-stone-900 placeholder:text-stone-400 focus:border-amber-900 focus:bg-white focus:outline-none"
                 />
                 <span className="absolute left-3.5 top-3.5 text-xs text-stone-400">🔍</span>
+                {lookupQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLookupQuery("");
+                      loadPendingOrders("");
+                    }}
+                    className="absolute right-3.5 top-3 text-xs text-stone-400 hover:text-stone-700"
+                    title="Clear filter"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               <button
                 type="submit"
-                disabled={isSearchingLookup || !lookupQuery.trim()}
+                disabled={isSearchingLookup}
                 className="rounded-2xl bg-amber-900 px-6 py-3 text-xs font-black text-white shadow-xs hover:bg-amber-950 disabled:opacity-50 transition"
               >
-                {isSearchingLookup ? "Searching..." : "Retrieve Order"}
+                {isSearchingLookup ? "Searching..." : "Filter Orders"}
               </button>
+              {lookupQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLookupQuery("");
+                    loadPendingOrders("");
+                  }}
+                  className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs font-bold text-stone-700 hover:bg-stone-100 transition"
+                >
+                  Show All ({lookupResults.length})
+                </button>
+              )}
             </form>
 
             {lookupError && (
@@ -356,129 +584,307 @@ export default function PosPage() {
             )}
           </section>
 
-          {/* SEARCH RESULTS & PENDING ORDER DETAIL */}
+          {/* TWO-COLUMN WORKSPACE: LEFT LIST & RIGHT EDITABLE REVIEW */}
           <div className="grid gap-6 lg:grid-cols-12">
-            {/* LEFT 6 COLS: RESULTS LIST */}
+            {/* LEFT 6 COLS: ORDERS LIST */}
             <div className="lg:col-span-6 space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-stone-500">
+                  Select Order to Review ({lookupResults.length})
+                </span>
+                <span className="text-[11px] text-stone-400">
+                  Auto-loaded in real time
+                </span>
+              </div>
+
               {isSearchingLookup ? (
                 <div className="space-y-3">
-                  {[1, 2].map((n) => (
+                  {[1, 2, 3].map((n) => (
                     <div key={n} className="animate-pulse rounded-3xl border border-stone-200 bg-white p-5 space-y-2">
                       <div className="h-4 w-32 bg-stone-200 rounded" />
                       <div className="h-3 w-48 bg-stone-100 rounded" />
                     </div>
                   ))}
                 </div>
-              ) : hasSearched && lookupResults.length === 0 ? (
+              ) : lookupResults.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-stone-200 bg-white p-12 text-center text-xs text-stone-500 space-y-2">
-                  <span className="text-3xl block">🔍</span>
-                  <p className="font-bold text-stone-800">No pending order found for &ldquo;{lookupQuery}&rdquo;</p>
-                  <p className="text-stone-400 text-[11px]">
-                    Check with the customer if their Reference Code or email is correct.
+                  <span className="text-3xl block">⏳</span>
+                  <p className="font-bold text-stone-800">
+                    {lookupQuery ? `No pending order found matching "${lookupQuery}"` : "No pending counter orders right now"}
                   </p>
+                  <p className="text-stone-400 text-[11px]">
+                    {lookupQuery
+                      ? "Check with the customer or clear filter to display all pending orders."
+                      : "When customers choose 'Pay at Counter' online, their orders appear here automatically."}
+                  </p>
+                  {lookupQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLookupQuery("");
+                        loadPendingOrders("");
+                      }}
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-black text-amber-900 hover:underline"
+                    >
+                      Show All Pending Orders
+                    </button>
+                  )}
                 </div>
               ) : (
-                lookupResults.map((order) => (
-                  <button
-                    key={order.order_id}
-                    type="button"
-                    onClick={() => handleSelectPendingOrder(order)}
-                    className={`w-full text-left rounded-3xl border p-5 transition shadow-xs ${
-                      selectedPendingOrder?.order_id === order.order_id
-                        ? "border-amber-900 bg-amber-50/60 ring-2 ring-amber-400"
-                        : "border-stone-200 bg-white hover:border-stone-300"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-lg bg-amber-200/70 px-2 py-0.5 text-xs font-black text-amber-950">
-                            {order.reference_code || `REF-${order.order_id}`}
+                lookupResults.map((order) => {
+                  const isSelected = selectedPendingOrder?.order_id === order.order_id;
+                  return (
+                    <div
+                      key={order.order_id}
+                      onClick={() => handleSelectPendingOrder(order)}
+                      className={`cursor-pointer w-full text-left rounded-3xl border p-5 transition shadow-xs ${
+                        isSelected
+                          ? "border-amber-900 bg-amber-50/60 ring-2 ring-amber-400"
+                          : "border-stone-200 bg-white hover:border-stone-300"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-lg bg-amber-200/70 px-2 py-0.5 text-xs font-black text-amber-950">
+                              {order.reference_code || `REF-${order.order_id}`}
+                            </span>
+                            <span className="font-extrabold text-stone-900 text-sm">
+                              {order.customer_name}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-stone-500 line-clamp-2">
+                            {order.items?.map((i) => `${i.quantity}x ${i.item_name}`).join(", ")}
+                          </p>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-sm font-black text-stone-900">
+                            ₱{Number(order.total_amount).toFixed(2)}
                           </span>
-                          <span className="font-extrabold text-stone-900 text-sm">
-                            {order.customer_name}
+                          <span className="block text-[10px] font-bold text-amber-800 uppercase mt-0.5">
+                            Awaiting Payment
                           </span>
                         </div>
-                        <p className="mt-1 text-xs text-stone-500">
-                          {order.items?.map((i) => `${i.quantity}x ${i.item_name}`).join(", ")}
-                        </p>
                       </div>
 
-                      <div className="text-right">
-                        <span className="text-sm font-black text-stone-900">
-                          ₱{Number(order.total_amount).toFixed(2)}
+                      <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2 text-xs">
+                        <span className="text-[11px] text-stone-400">
+                          {order.order_type === "takeout" ? "🛍️ Takeout" : "🍽️ Dine-In"} • #{order.order_id}
                         </span>
-                        <span className="block text-[10px] font-bold text-amber-800 uppercase mt-0.5">
-                          Awaiting Payment
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectPendingOrder(order);
+                          }}
+                          className="inline-flex items-center gap-1 font-bold text-amber-900 hover:text-amber-950 underline text-xs"
+                        >
+                          ✏️ Edit &amp; Review →
+                        </button>
                       </div>
                     </div>
-                  </button>
-                ))
+                  );
+                })
               )}
             </div>
 
-            {/* RIGHT 6 COLS: READ-ONLY REVIEW & CHARGE TERMINAL */}
+            {/* RIGHT 6 COLS: EDITABLE PENDING ORDER REVIEW & CHARGE TERMINAL */}
             <div className="lg:col-span-6">
               {selectedPendingOrder ? (
                 <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs space-y-4 sticky top-6">
-                  <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                  {/* HEADER */}
+                  <div className="flex items-center justify-between border-b border-stone-100 pb-3 gap-2">
                     <div>
                       <span className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider block">
-                        Pending Order Review
+                        Pending Order Review &amp; Edit
                       </span>
                       <h3 className="text-lg font-black text-stone-900">
-                        {selectedPendingOrder.reference_code} • {selectedPendingOrder.customer_name}
+                        {selectedPendingOrder.reference_code || `REF-${selectedPendingOrder.order_id}`} • {selectedPendingOrder.customer_name}
                       </h3>
                     </div>
 
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 border border-amber-300">
-                      Awaiting Cash/Card
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-900 border border-amber-300">
+                        Awaiting Payment
+                      </span>
+                    </div>
                   </div>
 
-                  {/* ITEM BREAKDOWN */}
-                  <div className="space-y-2 max-h-48 overflow-y-auto divide-y divide-stone-100 border-y border-stone-100 py-2">
-                    {selectedPendingOrder.items?.map((item) => (
-                      <div key={item.order_item_id} className="py-2 text-xs flex justify-between items-start">
-                        <div>
-                          <span className="font-bold text-stone-900">
-                            {item.quantity}x {item.item_name}
-                          </span>
-                          {item.size_name && (
-                            <span className="ml-1 text-[11px] text-stone-500 font-semibold">
-                              ({item.size_name})
-                            </span>
-                          )}
-                          {item.addons && item.addons.length > 0 && (
-                            <div className="text-[10px] text-stone-500 pl-3">
-                              + {item.addons.map((a) => a.addon_name).join(", ")}
-                            </div>
-                          )}
-                          {item.special_instructions && (
-                            <div className="text-[10px] text-amber-900 italic pl-3">
-                              Note: {item.special_instructions}
-                            </div>
-                          )}
+                  {/* ORDER ITEMS HEADER & ADD DRINK BUTTON */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-stone-700">
+                      Order Items ({pendingItems.length})
+                    </span>
+
+                    {/* ADD DRINK FROM MENU POPUP/DROPDOWN */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddDrinkDropdown((prev) => !prev)}
+                        className="flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-900 hover:bg-amber-100 transition shadow-2xs"
+                      >
+                        <span>➕ Add Drink from Menu</span>
+                      </button>
+
+                      {showAddDrinkDropdown && (
+                        <div className="absolute right-0 top-8 z-30 w-72 rounded-2xl border border-stone-200 bg-white p-3 shadow-xl space-y-2 animate-in fade-in duration-100">
+                          <div className="flex items-center justify-between border-b border-stone-100 pb-1.5">
+                            <span className="text-xs font-black text-stone-900">Add Menu Drink</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowAddDrinkDropdown(false);
+                                setAddDrinkSearch("");
+                              }}
+                              className="text-stone-400 hover:text-stone-700 text-xs"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          <input
+                            type="text"
+                            value={addDrinkSearch}
+                            onChange={(e) => setAddDrinkSearch(e.target.value)}
+                            placeholder="Search drinks..."
+                            className="w-full rounded-xl border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs text-stone-800 placeholder:text-stone-400 focus:border-amber-900 focus:bg-white focus:outline-none"
+                            autoFocus
+                          />
+
+                          <div className="max-h-52 overflow-y-auto divide-y divide-stone-100 space-y-1">
+                            {allItems
+                              .filter((it) => {
+                                const q = addDrinkSearch.trim().toLowerCase();
+                                if (!q) return true;
+                                return (
+                                  it.item_name.toLowerCase().includes(q) ||
+                                  (it.category_name && it.category_name.toLowerCase().includes(q))
+                                );
+                              })
+                              .map((drink) => (
+                                <button
+                                  key={drink.menu_item_id}
+                                  type="button"
+                                  onClick={() => {
+                                    setShowAddDrinkDropdown(false);
+                                    setAddDrinkSearch("");
+                                    handleSelectDrink(drink);
+                                  }}
+                                  className="w-full py-1.5 px-1 text-left flex items-center justify-between hover:bg-amber-50/70 rounded-lg transition"
+                                >
+                                  <div>
+                                    <span className="text-xs font-bold text-stone-900 block">
+                                      {drink.item_name}
+                                    </span>
+                                    <span className="text-[10px] text-stone-400">
+                                      {drink.category_name}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs font-black text-amber-900">
+                                    ₱{Number(drink.base_price).toFixed(2)}
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
                         </div>
-                        <span className="font-bold text-stone-900">₱{Number(item.subtotal).toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* EDITABLE ITEMS LIST */}
+                  <div className="space-y-2 max-h-56 overflow-y-auto divide-y divide-stone-100 border-y border-stone-100 py-2">
+                    {pendingItems.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-stone-400 italic">
+                        No items in this order. Add a drink above or re-select the order.
                       </div>
-                    ))}
+                    ) : (
+                      pendingItems.map((item) => (
+                        <div key={item.cart_id} className="py-2.5 text-xs flex justify-between items-start gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-stone-900">
+                                {item.item_name}
+                              </span>
+                              {item.size_name && (
+                                <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold text-stone-600">
+                                  {item.size_name}
+                                </span>
+                              )}
+                            </div>
+
+                            {item.addons && item.addons.length > 0 && (
+                              <div className="text-[10px] text-stone-500 mt-0.5">
+                                + {item.addons.map((a) => a.addon_name).join(", ")}
+                              </div>
+                            )}
+
+                            {item.special_instructions && (
+                              <div className="text-[10px] text-amber-900 italic mt-0.5">
+                                Note: {item.special_instructions}
+                              </div>
+                            )}
+
+                            <div className="text-[11px] font-semibold text-stone-500 mt-0.5">
+                              ₱{Number(item.unit_price).toFixed(2)} each
+                            </div>
+                          </div>
+
+                          {/* QUANTITY CONTROLS & LINE TOTAL */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center rounded-xl border border-stone-200 bg-stone-50 p-0.5">
+                              <button
+                                type="button"
+                                onClick={() => updatePendingItemQuantity(item.cart_id, -1)}
+                                className="flex h-6 w-6 items-center justify-center rounded-lg bg-white font-black text-stone-700 hover:bg-stone-200 shadow-2xs transition"
+                                title="Decrease quantity"
+                              >
+                                -
+                              </button>
+                              <span className="w-6 text-center text-xs font-black text-stone-900">
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updatePendingItemQuantity(item.cart_id, 1)}
+                                className="flex h-6 w-6 items-center justify-center rounded-lg bg-white font-black text-stone-700 hover:bg-stone-200 shadow-2xs transition"
+                                title="Increase quantity"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            <span className="w-16 text-right font-black text-stone-900">
+                              ₱{(item.unit_price * item.quantity).toFixed(2)}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => removePendingItem(item.cart_id)}
+                              className="p-1 text-stone-400 hover:text-rose-600 transition"
+                              title="Remove item"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
 
                   {/* FINANCIAL TOTALS */}
                   <div className="space-y-1 text-xs border-b border-stone-100 pb-3">
                     <div className="flex justify-between text-stone-600">
                       <span>Subtotal</span>
-                      <span>₱{Number(selectedPendingOrder.subtotal).toFixed(2)}</span>
+                      <span>₱{pendingSubtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-stone-600">
                       <span>Tax (8%)</span>
-                      <span>₱{Number(selectedPendingOrder.tax_amount).toFixed(2)}</span>
+                      <span>₱{pendingTax.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-base font-black text-stone-950 pt-1">
                       <span>Total Due</span>
-                      <span>₱{counterTotal.toFixed(2)}</span>
+                      <span className="text-amber-950">₱{pendingTotal.toFixed(2)}</span>
                     </div>
                   </div>
 
@@ -516,11 +922,11 @@ export default function PosPage() {
                           <input
                             type="number"
                             step="0.01"
-                            min={counterTotal}
+                            min={pendingTotal}
                             required
                             value={counterAmountTendered}
                             onChange={(e) => setCounterAmountTendered(e.target.value)}
-                            placeholder={counterTotal.toFixed(2)}
+                            placeholder={pendingTotal.toFixed(2)}
                             className="w-28 rounded-xl border border-stone-300 bg-white p-1.5 text-right text-xs font-black text-stone-900"
                           />
                         </div>
@@ -528,7 +934,7 @@ export default function PosPage() {
                         <div className="flex items-center gap-1.5 justify-end">
                           <button
                             type="button"
-                            onClick={() => setCounterAmountTendered(counterTotal.toFixed(2))}
+                            onClick={() => setCounterAmountTendered(pendingTotal.toFixed(2))}
                             className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
                           >
                             Exact
@@ -565,16 +971,20 @@ export default function PosPage() {
 
                     <button
                       type="submit"
-                      disabled={isSubmitting || (counterPaymentMethod === "cash" && counterNumericTendered < counterTotal)}
+                      disabled={
+                        isSubmitting ||
+                        pendingItems.length === 0 ||
+                        (counterPaymentMethod === "cash" && counterNumericTendered < pendingTotal)
+                      }
                       className="w-full rounded-2xl bg-amber-900 py-3.5 text-xs font-black text-white shadow-md hover:bg-amber-950 disabled:opacity-50 transition"
                     >
-                      {isSubmitting ? "Processing..." : `Charge ₱${counterTotal.toFixed(2)} & Issue Receipt 📄`}
+                      {isSubmitting ? "Processing..." : `Charge ₱${pendingTotal.toFixed(2)} & Dispatch to Barista 🚀`}
                     </button>
                   </form>
                 </div>
               ) : (
                 <div className="rounded-3xl border border-dashed border-stone-200 bg-stone-50/50 p-12 text-center text-xs text-stone-400">
-                  Select an order on the left to review items and collect payment.
+                  Select a pending counter order on the left to review items, edit quantities, and collect payment.
                 </div>
               )}
             </div>
@@ -586,7 +996,45 @@ export default function PosPage() {
       {/* MODE 2: NEW COUNTER SALE                                                  */}
       {/* ========================================================================= */}
       {activeMode === "register" && (
-        <div className="grid gap-6 lg:grid-cols-12 animate-in fade-in duration-150">
+        <div className="space-y-4 animate-in fade-in duration-150">
+          {/* EDITING PENDING ORDER BANNER */}
+          {editingPendingOrder && (
+            <div className="rounded-3xl border-2 border-amber-500 bg-amber-50 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-200 text-xl font-black text-amber-950">
+                  ✏️
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-lg bg-amber-900 px-2.5 py-0.5 text-xs font-black text-white">
+                      {editingPendingOrder.reference_code || `REF-${editingPendingOrder.order_id}`}
+                    </span>
+                    <span className="text-sm font-black text-stone-900">
+                      Modifying Order: {editingPendingOrder.customer_name}
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-900 mt-0.5">
+                    Modify drinks, sizes, modifiers, or quantities below. Totals recalculate live. When finished, collect payment to dispatch order straight to the Barista!
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPendingOrder(null);
+                  setCart([]);
+                  setCustomerName("Walk-in Guest");
+                  setCustomerEmail("");
+                }}
+                className="rounded-xl border border-amber-400 bg-white px-3.5 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100 transition shadow-xs shrink-0"
+              >
+                ✕ Cancel Editing
+              </button>
+            </div>
+          )}
+
+          <div className="grid gap-6 lg:grid-cols-12">
           {/* LEFT 7 COLS: MENU CATALOG */}
           <section className="lg:col-span-7 space-y-4">
             <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-xs space-y-3">
@@ -703,9 +1151,16 @@ export default function PosPage() {
           <section className="lg:col-span-5">
             <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs space-y-4 sticky top-6">
               <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                <h3 className="text-base font-extrabold text-stone-900">
-                  Register Ticket ({cart.reduce((a, c) => a + c.quantity, 0)} items)
-                </h3>
+                <div>
+                  <h3 className="text-base font-extrabold text-stone-900">
+                    {editingPendingOrder ? `Pending Order #${editingPendingOrder.order_id}` : "Register Ticket"} ({cart.reduce((a, c) => a + c.quantity, 0)} items)
+                  </h3>
+                  {editingPendingOrder && (
+                    <span className="text-[11px] font-bold text-amber-800 block mt-0.5">
+                      Editing for {editingPendingOrder.customer_name} ({editingPendingOrder.reference_code})
+                    </span>
+                  )}
+                </div>
                 {cart.length > 0 && (
                   <button
                     type="button"
@@ -916,13 +1371,18 @@ export default function PosPage() {
                   onClick={handleCheckout}
                   className="w-full rounded-2xl bg-amber-900 py-3.5 text-xs font-black text-white shadow-md hover:bg-amber-950 disabled:opacity-50 transition"
                 >
-                  {isSubmitting ? "Processing Sale..." : `Charge ₱${total.toFixed(2)} & Complete 📄`}
+                  {isSubmitting
+                    ? "Processing..."
+                    : editingPendingOrder
+                    ? `Charge ₱${total.toFixed(2)} & Dispatch to Barista 🚀`
+                    : `Charge ₱${total.toFixed(2)} & Complete 📄`}
                 </button>
               </div>
             </div>
           </section>
         </div>
-      )}
+      </div>
+    )}
 
       {/* CUSTOMIZE ITEM MODAL */}
       {customizingItem && (
@@ -1092,16 +1552,24 @@ export default function PosPage() {
               )}
             </div>
 
-            {/* DOWNLOAD/VIEW RECEIPT PDF BUTTON */}
+            {/* PRINT & DOWNLOAD RECEIPT PDF BUTTONS */}
             {confirmedReceipt.receipt_pdf_url && (
-              <a
-                href={confirmedReceipt.receipt_pdf_url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-center gap-2 w-full rounded-xl border border-stone-300 bg-stone-50 py-2.5 text-xs font-bold text-stone-800 hover:bg-stone-100 transition"
-              >
-                <span>📄 View / Print Official Receipt (PDF)</span>
-              </a>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => printReceipt(confirmedReceipt.receipt_pdf_url)}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-stone-50 py-2.5 text-xs font-bold text-stone-800 hover:bg-stone-100 transition"
+                >
+                  <span>🖨️ Print Receipt</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadReceipt(confirmedReceipt.receipt_pdf_url, confirmedReceipt.order_id)}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition"
+                >
+                  <span>⬇️ Download PDF</span>
+                </button>
+              </div>
             )}
 
             <button

@@ -47,9 +47,8 @@ def wipe_test_data():
 @pytest.fixture(scope="session", autouse=True)
 def clean_database_after_test_session():
     """
-    Session-scoped autouse fixture that guarantees all test-created users,
-    orders, menu items, stocks, and categories are automatically wiped
-    at the end of any pytest execution, preserving only the 5 system accounts.
+    Do not wipe database at end of test session to prevent destroying
+    user menu, inventory, and orders.
     """
     yield
-    wipe_test_data()
+    # wipe_test_data() disabled to preserve database records

@@ -9,6 +9,7 @@ from app.modules.orders.schemas import (
     OrderStatusUpdateRequest,
     OrderTrackingRequest,
     OrderTrackingResponse,
+    PendingOrderUpdateRequest,
     POSOrderCreateRequest,
 )
 from app.modules.orders.serializers import serialize_order, serialize_order_tracking
@@ -44,12 +45,13 @@ def get_all_orders(
 
 @router.get("/counter-lookup", response_model=list[CustomerOrderResponse])
 def search_pending_counter_orders(
-    q: str,
     authentication: CurrentAuthenticationDependency,
     database: DatabaseDependency,
+    q: str = "",
 ) -> list[CustomerOrderResponse]:
     """
     Look up pending Pay-at-Counter orders by reference code (REF-XXXX), email, or name.
+    If q is empty, returns all active pending counter orders.
     """
     orders = orders_service.lookup_pending_counter_order(database, q)
     return [serialize_order(o) for o in orders]
@@ -69,6 +71,26 @@ def confirm_counter_payment(
         database=database,
         order_id=order_id,
         payload=payload,
+        cashier_user=authentication.user,
+    )
+    return serialize_order(order)
+
+
+@router.put("/{order_id}", response_model=CustomerOrderResponse)
+def update_pending_order_items(
+    order_id: int,
+    payload: PendingOrderUpdateRequest,
+    authentication: CurrentAuthenticationDependency,
+    database: DatabaseDependency,
+) -> CustomerOrderResponse:
+    """
+    Cashier updates items/sizes/addons on an AWAITING_PAYMENT order before taking payment.
+    """
+    order = orders_service.update_pending_order(
+        database=database,
+        order_id=order_id,
+        items=payload.items,
+        order_type=payload.order_type,
         cashier_user=authentication.user,
     )
     return serialize_order(order)
@@ -152,6 +174,7 @@ def track_customer_order(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many tracking inquiries. Please wait a moment before trying again.",
+            headers={"Retry-After": "30"},
         )
 
     order = orders_service.get_order_for_tracking(database, payload.order_id, payload.email)
