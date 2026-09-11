@@ -103,6 +103,11 @@ class Customer(TimestampMixin, Base):
         nullable=True,
     )
 
+    dietary_notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    favorite_item_notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    marketing_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    marketing_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     orders: Mapped[list[Order]] = relationship(
         "Order",
         back_populates="customer",

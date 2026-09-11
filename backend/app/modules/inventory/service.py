@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.modules.inventory.models import (
@@ -12,6 +12,8 @@ from app.modules.inventory.models import (
 )
 from app.modules.inventory.schemas import (
     InventoryItemCreate,
+    InventoryForecastItem,
+    InventoryForecastResponse,
     InventoryItemUpdate,
     InventoryOption,
 )
@@ -349,3 +351,21 @@ def list_inventory_transactions(
         stmt = stmt.where(InventoryTransaction.inventory_item_id == item_id)
     return list(database.scalars(stmt).all())
 
+
+def get_inventory_forecast(database: Session, forecast_days: int = 7) -> InventoryForecastResponse:
+    """Use trailing 28-day consumption as a transparent replenishment forecast."""
+    start = datetime.now(timezone.utc) - timedelta(days=28)
+    rows = database.execute(
+        select(InventoryTransaction.inventory_item_id, func.coalesce(func.sum(-InventoryTransaction.quantity_change), 0))
+        .where(InventoryTransaction.transaction_date >= start, InventoryTransaction.quantity_change < 0)
+        .group_by(InventoryTransaction.inventory_item_id)
+    ).all()
+    consumed = dict(rows)
+    items = []
+    for item in database.scalars(select(InventoryItem).where(InventoryItem.is_active.is_(True)).order_by(InventoryItem.item_name)):
+        daily = (Decimal(consumed.get(item.inventory_item_id, 0)) / Decimal(28)).quantize(Decimal("0.001"))
+        target = max(item.reorder_level, daily * Decimal(forecast_days))
+        suggested = max(target - item.quantity_on_hand, Decimal("0.000")).quantize(Decimal("0.001"))
+        remaining = (item.quantity_on_hand / daily).quantize(Decimal("0.1")) if daily else None
+        items.append(InventoryForecastItem(inventory_item_id=item.inventory_item_id, item_name=item.item_name, unit_of_measure=item.unit_of_measure, quantity_on_hand=item.quantity_on_hand, average_daily_usage=daily, projected_days_remaining=remaining, suggested_purchase_quantity=suggested))
+    return InventoryForecastResponse(forecast_days=forecast_days, items=items)

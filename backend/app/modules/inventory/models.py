@@ -64,6 +64,14 @@ class InventoryItem(TimestampMixin, Base):
         autoincrement=True,
     )
 
+    branch_id: Mapped[int] = mapped_column(
+        ForeignKey("branches.branch_id"),
+        default=1,
+        server_default="1",
+        nullable=False,
+        index=True,
+    )
+
     item_name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,

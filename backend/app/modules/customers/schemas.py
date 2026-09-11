@@ -1,10 +1,25 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.customers.models import LoyaltyTransactionType
+
+
+class CustomerMetricsResponse(BaseModel):
+    customer_id: int
+    visit_count: int
+    lifetime_spend: Decimal
+    average_order_value: Decimal
+    last_order_at: datetime | None
+    loyalty_points_balance: int
+
+class CustomerPreferencesUpdate(BaseModel):
+    dietary_notes: str | None = Field(default=None, max_length=500)
+    favorite_item_notes: str | None = Field(default=None, max_length=500)
+    marketing_consent: bool
 
 
 class CustomerResponse(BaseModel):
@@ -15,6 +30,9 @@ class CustomerResponse(BaseModel):
     last_name: str | None = None
     email: str | None = None
     phone_number: str | None = None
+    dietary_notes: str | None = None
+    favorite_item_notes: str | None = None
+    marketing_consent: bool = False
     loyalty_points_balance: int = 0
     is_guest: bool = True
     is_blocked: bool = False

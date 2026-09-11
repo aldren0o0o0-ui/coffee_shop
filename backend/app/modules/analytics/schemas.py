@@ -74,6 +74,9 @@ class OwnerDashboardStats(BaseModel):
     low_stock_count: int
     recent_orders: list[RecentOrderInfo]
     low_stock_items: list[LowStockItemInfo]
+    cash_variance_today: Decimal | None = None
+    queue_health: dict | None = None
+    active_alerts_count: int = 0
 
 
 class ManagerDashboardStats(BaseModel):

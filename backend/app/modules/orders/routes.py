@@ -108,6 +108,7 @@ def change_order_status(
         order_id=order_id,
         new_status=payload.status,
         current_user=authentication.user,
+        metadata=payload.metadata,
     )
     return serialize_order(order)
 

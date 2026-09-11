@@ -42,6 +42,9 @@ from app.modules.procurement.models import (
     PurchaseRequest,
     PurchaseRequestStatus,
 )
+from app.modules.notifications.models import SystemAlert
+from app.modules.notifications.service import evaluate_system_alerts
+from app.modules.shifts.models import Shift, ShiftStatus
 from app.modules.users.models import User, UserRole
 
 
@@ -63,7 +66,7 @@ def get_today_start() -> datetime:
     return datetime.now(store_tz).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def get_owner_dashboard_stats(database: Session) -> OwnerDashboardStats:
+def get_owner_dashboard_stats(database: Session, branch_id: int | None = None) -> OwnerDashboardStats:
     today_start = get_today_start()
 
     # Revenue
@@ -79,20 +82,28 @@ def get_owner_dashboard_stats(database: Session) -> OwnerDashboardStats:
             ]),
         )
     )
+    if branch_id is not None:
+        revenue_stmt = revenue_stmt.where(Order.branch_id == branch_id)
     today_revenue = database.scalar(revenue_stmt) or Decimal("0.00")
 
     # Order counts
     total_orders_stmt = select(func.count(Order.order_id)).where(Order.order_date >= today_start)
+    if branch_id is not None:
+        total_orders_stmt = total_orders_stmt.where(Order.branch_id == branch_id)
     today_orders_count = database.scalar(total_orders_stmt) or 0
 
     completed_orders_stmt = select(func.count(Order.order_id)).where(
         Order.order_date >= today_start,
         Order.order_status == OrderStatus.COMPLETED,
     )
+    if branch_id is not None:
+        completed_orders_stmt = completed_orders_stmt.where(Order.branch_id == branch_id)
     completed_orders_count = database.scalar(completed_orders_stmt) or 0
 
     # Active staff
     active_staff_stmt = select(func.count(User.user_id)).where(User.is_active.is_(True))
+    if branch_id is not None:
+        active_staff_stmt = active_staff_stmt.where(User.branch_id == branch_id)
     active_staff_count = database.scalar(active_staff_stmt) or 0
 
     # Low stock items
@@ -103,6 +114,8 @@ def get_owner_dashboard_stats(database: Session) -> OwnerDashboardStats:
             InventoryItem.quantity_on_hand <= InventoryItem.reorder_level,
         )
     )
+    if branch_id is not None:
+        low_stock_stmt = low_stock_stmt.where(InventoryItem.branch_id == branch_id)
     low_stock_rows = list(database.scalars(low_stock_stmt).all())
     low_stock_count = len(low_stock_rows)
 
@@ -128,9 +141,10 @@ def get_owner_dashboard_stats(database: Session) -> OwnerDashboardStats:
             selectinload(Order.order_items).selectinload(OrderItem.menu_item_size),
         )
         .order_by(Order.order_date.desc())
-        .limit(5)
     )
-    recent_order_rows = list(database.scalars(recent_orders_stmt).all())
+    if branch_id is not None:
+        recent_orders_stmt = recent_orders_stmt.where(Order.branch_id == branch_id)
+    recent_order_rows = list(database.scalars(recent_orders_stmt.limit(5)).all())
 
     recent_orders = []
     for o in recent_order_rows:
@@ -156,6 +170,54 @@ def get_owner_dashboard_stats(database: Session) -> OwnerDashboardStats:
             )
         )
 
+    # Cash variance today from closed shifts
+    variance_stmt = select(func.coalesce(func.sum(Shift.variance), Decimal("0.00"))).where(
+        Shift.status == ShiftStatus.CLOSED,
+        Shift.closed_at >= today_start,
+    )
+    if branch_id is not None:
+        variance_stmt = variance_stmt.where(Shift.branch_id == branch_id)
+    cash_variance_today = database.scalar(variance_stmt) or Decimal("0.00")
+
+    # Queue health
+    queue_stmt = select(Order).where(
+        Order.order_status.in_([OrderStatus.CONFIRMED, OrderStatus.PREPARING]),
+    )
+    if branch_id is not None:
+        queue_stmt = queue_stmt.where(Order.branch_id == branch_id)
+    active_queue = list(database.scalars(queue_stmt).all())
+    total_queued = len(active_queue)
+    now_utc = datetime.now(timezone.utc)
+    delayed_count = 0
+    total_wait_mins = 0
+    for o in active_queue:
+        od = o.order_date
+        if od.tzinfo is None:
+            od = od.replace(tzinfo=timezone.utc)
+        mins = max(0, int((now_utc - od).total_seconds() / 60))
+        if mins > 20:
+            delayed_count += 1
+        total_wait_mins += mins
+    avg_wait = round(total_wait_mins / total_queued, 1) if total_queued > 0 else 0.0
+    queue_status = "delayed" if delayed_count > 0 else ("busy" if total_queued >= 5 else "healthy")
+    queue_health = {
+        "total_queued": total_queued,
+        "delayed_count": delayed_count,
+        "avg_wait_minutes": avg_wait,
+        "status": queue_status,
+    }
+
+    # Active alerts count
+    try:
+        evaluate_system_alerts(database)
+    except Exception:
+        pass
+
+    alert_stmt = select(func.count(SystemAlert.alert_id)).where(SystemAlert.is_resolved.is_(False))
+    if branch_id is not None:
+        alert_stmt = alert_stmt.where((SystemAlert.branch_id == branch_id) | (SystemAlert.branch_id.is_(None)))
+    active_alerts_count = database.scalar(alert_stmt) or 0
+
     return OwnerDashboardStats(
         today_revenue=today_revenue,
         today_orders_count=today_orders_count,
@@ -164,6 +226,9 @@ def get_owner_dashboard_stats(database: Session) -> OwnerDashboardStats:
         low_stock_count=low_stock_count,
         recent_orders=recent_orders,
         low_stock_items=low_stock_items,
+        cash_variance_today=cash_variance_today,
+        queue_health=queue_health,
+        active_alerts_count=active_alerts_count,
     )
 
 
@@ -519,7 +584,7 @@ def get_inventory_dashboard_stats(database: Session) -> InventoryStaffDashboardS
     )
 
 
-def get_combined_dashboard_overview(database: Session, user: User) -> CombinedDashboardResponse:
+def get_combined_dashboard_overview(database: Session, user: User, branch_id: int | None = None) -> CombinedDashboardResponse:
     user_roles = [r.role.role_name.lower() for r in user.user_roles if r.is_active and r.role.is_active]
 
     primary_role = "cashier"
@@ -532,7 +597,8 @@ def get_combined_dashboard_overview(database: Session, user: User) -> CombinedDa
     elif "inventory staff" in user_roles or "inventory_staff" in user_roles:
         primary_role = "inventory"
 
-    owner_stats = get_owner_dashboard_stats(database)
+    effective_branch_id = branch_id if branch_id is not None else getattr(user, "branch_id", None)
+    owner_stats = get_owner_dashboard_stats(database, branch_id=effective_branch_id)
     manager_stats = get_manager_dashboard_stats(database)
     cashier_stats = get_cashier_dashboard_stats(database)
     barista_stats = get_barista_queue(database)

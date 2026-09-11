@@ -16,12 +16,38 @@ export default function DrinkPreparationPage() {
 
   // Polling state
   const [isPollingActive, setIsPollingActive] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [prevCount, setPrevCount] = useState(0);
 
   // Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   // User roles
   const userRoles = user?.roles?.map((r) => r.role_name.toLowerCase()) || [];
+
+  function playAlertChime() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch (e) {
+      console.warn("Audio chime unavailable:", e);
+    }
+  }
+
+  function getEstimatedPrepTime(order, index) {
+    const itemCount = order.items ? order.items.reduce((sum, it) => sum + (it.quantity || 1), 0) : 1;
+    return 4 + itemCount * 2 + Math.max(index, 0) * 3;
+  }
 
   async function loadQueue(isInitial = false) {
     if (isInitial) {
@@ -41,6 +67,11 @@ export default function DrinkPreparationPage() {
         const status = (o.order_status || "").toLowerCase();
         return ["confirmed", "preparing", "ready"].includes(status);
       });
+
+      if (!isInitial && activeOrders.length > prevCount && soundEnabled) {
+        playAlertChime();
+      }
+      setPrevCount(activeOrders.length);
       setOrders(activeOrders);
     } catch (err) {
       console.error("Failed to load queue:", err);
@@ -141,6 +172,30 @@ export default function DrinkPreparationPage() {
               {isPollingActive ? "Pause" : "Resume"}
             </button>
           </div>
+
+          {/* Audio Chime Toggle */}
+          <button
+            type="button"
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`flex items-center gap-1.5 rounded-2xl border px-3 py-2 text-xs font-semibold shadow-xs transition ${
+              soundEnabled
+                ? "border-amber-300 bg-amber-50 text-amber-900"
+                : "border-stone-200 bg-stone-50 text-stone-500"
+            }`}
+          >
+            <span>{soundEnabled ? "🔔 Chime On" : "🔕 Muted"}</span>
+          </button>
+
+          {/* Link to public Pickup Display */}
+          <a
+            href="/pickup"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-2xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-xs font-bold text-stone-700 shadow-xs hover:bg-stone-100 transition"
+          >
+            <span>📺</span>
+            <span>Pickup TV Screen</span>
+          </a>
 
           <button
             onClick={() => loadQueue(false)}
@@ -336,6 +391,11 @@ export default function DrinkPreparationPage() {
                       <span className="text-[10px] font-bold text-stone-400 block">
                         ⏱️ {elapsed}
                       </span>
+                      {!isReady && (
+                        <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded block">
+                          ~{getEstimatedPrepTime(order, 0)}m prep
+                        </span>
+                      )}
                     </div>
                   </div>
 

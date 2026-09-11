@@ -2,6 +2,7 @@ import './App.css'
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { useAuth } from './modules/auth/context/useAuth';
+import { BranchProvider } from './modules/branches/context/BranchProvider';
 import AuthForm from './modules/auth/components/AuthForm';
 import ProtectedRoute from './modules/auth/components/ProtectedRoute';
 import RoleRoute from './modules/auth/components/RoleRoute';
@@ -17,10 +18,14 @@ import LandingPage from './pages/LandingPage';
 import PosPage from './modules/orders/pages/PosPage';
 import OrdersPage from './modules/orders/pages/OrdersPage';
 import DrinkPreparationPage from './modules/orders/pages/DrinkPreparationPage';
+import PickupBoardPage from './modules/orders/pages/PickupBoardPage';
 import InventoryPage from './modules/inventory/pages/InventoryPage';
 import PurchasingPage from './modules/procurement/pages/PurchasingPage';
 import ReportsPage from './modules/analytics/pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import CostingPage from './modules/costing/pages/CostingPage';
+import ShiftPage from './modules/shifts/pages/ShiftPage';
+import CustomerProfilePage from './modules/customers/pages/CustomerProfilePage';
 
 function LoginRoute() {
   const { 
@@ -46,14 +51,16 @@ function LoginRoute() {
 
 function App() {
   return (
-    <Routes>
-      {/* Public Landing Page for Viewers */}
-      <Route element={<LandingPage />} path="/" />
+    <BranchProvider>
+      <Routes>
+        {/* Public Landing Page for Viewers */}
+        <Route element={<LandingPage />} path="/" />
 
       {/* Public Customer Browsing, Ordering & Tracking */}
       <Route element={<CustomerBrowsePage />} path="/browse" />
       <Route element={<CustomerOrderPage />} path="/order" />
       <Route element={<CustomerTrackingPage />} path="/track" />
+      <Route element={<PickupBoardPage />} path="/pickup" />
 
       {/* Staff Authentication */}
       <Route element={<LoginRoute />} path="/login" />
@@ -67,6 +74,8 @@ function App() {
           {/* POS: Owner, Manager, Cashier */}
           <Route element={<RoleRoute allowedRoles={["owner", "manager", "cashier"]} />}>
             <Route element={<PosPage />} path="pos" />
+            <Route element={<ShiftPage />} path="shift" />
+            <Route element={<CustomerProfilePage />} path="customers" />
             <Route element={<Navigate to="/pos?mode=lookup" replace />} path="staff/pos" />
           </Route>
 
@@ -98,6 +107,7 @@ function App() {
           {/* Reports & Analytics: Owner, Manager */}
           <Route element={<RoleRoute allowedRoles={["owner", "manager"]} />}>
             <Route element={<ReportsPage />} path="reports" />
+            <Route element={<CostingPage />} path="costing" />
           </Route>
 
           {/* Team Accounts: Owner only */}
@@ -112,9 +122,10 @@ function App() {
         </Route>
       </Route>
 
-      {/* Catch-all fallback */}
-      <Route element={<Navigate replace to="/" />} path="*" />
-    </Routes>
+        {/* Catch-all fallback */}
+        <Route element={<Navigate replace to="/" />} path="*" />
+      </Routes>
+    </BranchProvider>
   );
 }
 

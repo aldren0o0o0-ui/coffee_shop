@@ -12,6 +12,24 @@ from app.modules.customers.models import (
     LoyaltyTransaction,
     LoyaltyTransactionType,
 )
+from app.modules.orders.models import Order, OrderStatus
+
+
+def get_customer_metrics(database: Session, customer_id: int):
+    customer = get_customer_by_id(database, customer_id)
+    if not customer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found.")
+    total, count, last_order = database.execute(select(func.coalesce(func.sum(Order.total_amount), 0), func.count(Order.order_id), func.max(Order.order_date)).where(Order.customer_id == customer_id, Order.order_status.in_([OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.COMPLETED]))).one()
+    from app.modules.customers.schemas import CustomerMetricsResponse
+    total = Decimal(total)
+    return CustomerMetricsResponse(customer_id=customer_id, visit_count=count, lifetime_spend=total, average_order_value=(total / count if count else Decimal("0.00")), last_order_at=last_order, loyalty_points_balance=customer.loyalty_points_balance)
+
+def update_customer_preferences(database: Session, customer_id: int, dietary_notes: str | None, favorite_item_notes: str | None, marketing_consent: bool) -> Customer:
+    customer = get_customer_by_id(database, customer_id)
+    if not customer: raise HTTPException(status_code=404, detail="Customer not found.")
+    customer.dietary_notes = dietary_notes; customer.favorite_item_notes = favorite_item_notes; customer.marketing_consent = marketing_consent
+    customer.marketing_consent_at = datetime.now(timezone.utc) if marketing_consent else None
+    database.commit(); database.refresh(customer); return customer
 
 logger = logging.getLogger(__name__)
 

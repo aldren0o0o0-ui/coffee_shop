@@ -64,6 +64,14 @@ class PurchaseRequest(TimestampMixin, Base):
         autoincrement=True,
     )
 
+    branch_id: Mapped[int] = mapped_column(
+        ForeignKey("branches.branch_id"),
+        default=1,
+        server_default="1",
+        nullable=False,
+        index=True,
+    )
+
     requested_by: Mapped[int] = mapped_column(
         ForeignKey(
             "users.user_id",

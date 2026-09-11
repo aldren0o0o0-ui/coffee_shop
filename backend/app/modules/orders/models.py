@@ -113,6 +113,16 @@ class Order(TimestampMixin, Base):
         index=True,
     )
 
+    branch_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "branches.branch_id",
+        ),
+        default=1,
+        server_default="1",
+        nullable=False,
+        index=True,
+    )
+
     order_channel: Mapped[OrderChannel] = mapped_column(
         SqlEnum(
             OrderChannel,
@@ -231,6 +241,13 @@ class Order(TimestampMixin, Base):
     loyalty_transactions: Mapped[list[LoyaltyTransaction]] = relationship(
         "LoyaltyTransaction",
         back_populates="order",
+    )
+
+    events: Mapped[list[OrderEvent]] = relationship(
+        "OrderEvent",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        order_by="OrderEvent.created_at.asc()",
     )
 
 
@@ -388,3 +405,78 @@ class OrderItemAddon(Base):
         "MenuItemAddon",
         back_populates="order_item_addons",
     )
+
+
+class OrderEvent(Base):
+    __tablename__ = "order_events"
+
+    order_event_id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "orders.order_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    previous_status: Mapped[OrderStatus | None] = mapped_column(
+        SqlEnum(
+            OrderStatus,
+            name="order_status",
+            native_enum=False,
+            values_callable=enum_values,
+            validate_strings=True,
+        ),
+        nullable=True,
+    )
+
+    new_status: Mapped[OrderStatus] = mapped_column(
+        SqlEnum(
+            OrderStatus,
+            name="order_status",
+            native_enum=False,
+            values_callable=enum_values,
+            validate_strings=True,
+        ),
+        nullable=False,
+    )
+
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "users.user_id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    metadata_json: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    order: Mapped[Order] = relationship(
+        "Order",
+        back_populates="events",
+    )
+
+    staff_user: Mapped[User | None] = relationship(
+        "User",
+        foreign_keys=[user_id],
+    )
+
+    @property
+    def staff_actor(self) -> User | None:
+        return self.staff_user

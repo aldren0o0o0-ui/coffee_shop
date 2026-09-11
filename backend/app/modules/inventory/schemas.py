@@ -83,3 +83,22 @@ class InventoryTransactionDetailResponse(BaseModel):
     creator_name: str | None = None
     transaction_date: datetime
     created_at: datetime
+
+
+class InventoryForecastItem(BaseModel):
+    inventory_item_id: int
+    item_name: str
+    unit_of_measure: str
+    quantity_on_hand: Decimal
+    average_daily_usage: Decimal
+    projected_days_remaining: Decimal | None
+    suggested_purchase_quantity: Decimal
+
+
+class InventoryForecastResponse(BaseModel):
+    forecast_days: int
+    items: list[InventoryForecastItem]
+
+
+class ForecastPurchaseRequest(BaseModel):
+    days: int = Field(default=7, ge=1, le=30)

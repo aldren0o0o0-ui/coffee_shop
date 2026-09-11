@@ -34,8 +34,9 @@ def verify_manager_or_owner(user):
 def get_dashboard_overview(
     authentication: CurrentAuthenticationDependency,
     database: DatabaseDependency,
+    branch_id: int | None = Query(default=None),
 ) -> CombinedDashboardResponse:
-    return get_combined_dashboard_overview(database, authentication.user)
+    return get_combined_dashboard_overview(database, authentication.user, branch_id=branch_id)
 
 
 @router.get("/barista-queue", response_model=BaristaDashboardStats)

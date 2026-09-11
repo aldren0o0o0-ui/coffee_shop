@@ -1,6 +1,7 @@
 from app.modules.orders.models import Order
 from app.modules.orders.schemas import (
     CustomerOrderResponse,
+    OrderEventResponse,
     OrderItemAddonResponse,
     OrderItemResponse,
     OrderTrackingResponse,
@@ -43,6 +44,24 @@ def serialize_order(order: Order) -> CustomerOrderResponse:
     amount_tendered = latest_payment.amount_tendered if latest_payment else None
     change_due = latest_payment.change_due if latest_payment else None
 
+    events = [
+        OrderEventResponse(
+            order_event_id=ev.order_event_id,
+            order_id=ev.order_id,
+            previous_status=ev.previous_status,
+            new_status=ev.new_status,
+            user_id=ev.user_id,
+            staff_actor_name=(
+                f"{ev.staff_user.first_name} {ev.staff_user.last_name or ''}".strip()
+                if hasattr(ev, "staff_user") and ev.staff_user and ev.staff_user.first_name
+                else None
+            ),
+            created_at=ev.created_at,
+            metadata_json=ev.metadata_json,
+        )
+        for ev in (order.events if hasattr(order, "events") and order.events else [])
+    ]
+
     return CustomerOrderResponse(
         order_id=order.order_id,
         customer_name=customer_name,
@@ -64,6 +83,7 @@ def serialize_order(order: Order) -> CustomerOrderResponse:
         expires_at=order.expires_at,
         picked_up_at=order.picked_up_at,
         items=items,
+        events=events,
     )
 
 
@@ -100,6 +120,24 @@ def serialize_order_tracking(order: Order) -> OrderTrackingResponse:
     latest_payment = order.payments[-1] if hasattr(order, "payments") and order.payments else None
     receipt_pdf_url = latest_payment.receipt_pdf_url if latest_payment else None
 
+    events = [
+        OrderEventResponse(
+            order_event_id=ev.order_event_id,
+            order_id=ev.order_id,
+            previous_status=ev.previous_status,
+            new_status=ev.new_status,
+            user_id=ev.user_id,
+            staff_actor_name=(
+                f"{ev.staff_user.first_name} {ev.staff_user.last_name or ''}".strip()
+                if hasattr(ev, "staff_user") and ev.staff_user and ev.staff_user.first_name
+                else None
+            ),
+            created_at=ev.created_at,
+            metadata_json=ev.metadata_json,
+        )
+        for ev in (order.events if hasattr(order, "events") and order.events else [])
+    ]
+
     return OrderTrackingResponse(
         order_id=order.order_id,
         order_status=order.order_status,
@@ -113,4 +151,5 @@ def serialize_order_tracking(order: Order) -> OrderTrackingResponse:
         picked_up_at=order.picked_up_at,
         customer_name=customer_name,
         items=items,
+        events=events,
     )

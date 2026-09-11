@@ -17,7 +17,7 @@ from app.modules.inventory.service import (
     deduct_inventory_for_order,
 )
 from app.modules.menu.models import MenuItem, MenuItemIngredient
-from app.modules.orders.models import Order, OrderItem, OrderItemAddon, OrderStatus
+from app.modules.orders.models import Order, OrderEvent, OrderItem, OrderItemAddon, OrderStatus
 from app.modules.payments.models import Payment, PaymentMethod, PaymentStatus
 from app.modules.payments.receipt import generate_receipt_pdf
 from app.modules.payments.schemas import CustomerPaymentRequest, PayAtCounterRequest
@@ -241,6 +241,17 @@ def process_customer_payment(
     order.pickup_code_expires_at = now + timedelta(hours=4)
     order.order_status = OrderStatus.CONFIRMED
 
+    database.add(
+        OrderEvent(
+            order_id=order.order_id,
+            previous_status=OrderStatus.AWAITING_PAYMENT,
+            new_status=OrderStatus.CONFIRMED,
+            user_id=None,
+            created_at=now,
+            metadata_json='{"source": "online_payment"}',
+        )
+    )
+
     # 8. Generate Immutable Thermal Receipt PDF
     try:
         receipt_url = generate_receipt_pdf(order, payment)
@@ -346,6 +357,17 @@ def process_pay_at_counter(
     order.pickup_code = pickup_code
     order.pickup_code_expires_at = now + timedelta(hours=4)
     order.user_id = cashier_user.user_id
+
+    database.add(
+        OrderEvent(
+            order_id=order.order_id,
+            previous_status=OrderStatus.AWAITING_PAYMENT,
+            new_status=OrderStatus.CONFIRMED,
+            user_id=cashier_user.user_id,
+            created_at=now,
+            metadata_json='{"source": "counter_payment"}',
+        )
+    )
 
     payment = Payment(
         order_id=order.order_id,

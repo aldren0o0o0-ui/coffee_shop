@@ -4,6 +4,8 @@ import {
   createInventoryItem,
   fetchInventoryItems,
   fetchInventoryTransactions,
+  fetchInventoryForecast,
+  createForecastPurchaseRequest,
   updateInventoryItem,
 } from "../api/inventoryApi";
 import { formatCurrency } from "../../payments/utils/currency";
@@ -13,6 +15,8 @@ export default function InventoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [forecast, setForecast] = useState(null);
+  const [isCreatingForecastRequest, setIsCreatingForecastRequest] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState("all"); // 'all' | 'low' | 'out' | 'active'
@@ -64,6 +68,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     loadItems();
+    fetchInventoryForecast().then(setForecast).catch(() => {});
   }, []);
 
   function showBanner(msg, isSuccess = true) {
@@ -318,6 +323,13 @@ export default function InventoryPage() {
           </button>
         </div>
       </div>
+
+      {forecast && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3"><div><h3 className="font-bold text-amber-950">7-day replenishment outlook</h3><p className="text-xs text-amber-800">Based on the previous 28 days of usage and waste.</p></div><button className="rounded-lg bg-amber-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" disabled={isCreatingForecastRequest} onClick={async () => { setIsCreatingForecastRequest(true); try { const request = await createForecastPurchaseRequest(); showBanner(`Draft purchase request #${request.purchase_request_id} created.`); } catch (err) { showBanner(err.response?.data?.detail || "Unable to create purchase request.", false); } finally { setIsCreatingForecastRequest(false); } }} type="button">{isCreatingForecastRequest ? "Creating…" : "Create draft request"}</button></div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{forecast.items.filter((item) => Number(item.suggested_purchase_quantity) > 0).slice(0, 6).map((item) => <div className="rounded-xl bg-white p-3" key={item.inventory_item_id}><p className="font-semibold text-stone-900">{item.item_name}</p><p className="text-xs text-stone-500">Suggested: {item.suggested_purchase_quantity} {item.unit_of_measure}</p><p className="mt-1 text-xs text-amber-800">{item.projected_days_remaining == null ? "No usage history" : `${item.projected_days_remaining} days remaining`}</p></div>)}</div>
+        </section>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

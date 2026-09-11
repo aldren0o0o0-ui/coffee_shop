@@ -7,12 +7,15 @@ from app.modules.inventory.schemas import (
     InventoryItemResponse,
     InventoryItemUpdate,
     InventoryOption,
+    InventoryForecastResponse,
+    ForecastPurchaseRequest,
     InventoryTransactionDetailResponse,
 )
 from app.modules.inventory.service import (
     adjust_inventory_stock,
     create_inventory_item,
     get_inventory_options,
+    get_inventory_forecast,
     list_inventory_items,
     list_inventory_transactions,
     update_inventory_item,
@@ -54,6 +57,25 @@ def fetch_inventory_items_route(
     Lists all inventory items.
     """
     return list_inventory_items(database)
+
+
+@router.get("/forecast", response_model=InventoryForecastResponse)
+def fetch_inventory_forecast_route(authentication: CurrentAuthenticationDependency, database: DatabaseDependency, days: int = Query(default=7, ge=1, le=30)) -> InventoryForecastResponse:
+    verify_inventory_access(authentication.user)
+    return get_inventory_forecast(database, days)
+
+
+@router.post("/forecast/purchase-request", status_code=status.HTTP_201_CREATED)
+def create_forecast_purchase_request(payload: ForecastPurchaseRequest, authentication: CurrentAuthenticationDependency, database: DatabaseDependency):
+    """Convert current forecast recommendations into an editable procurement draft."""
+    verify_inventory_access(authentication.user)
+    from app.modules.procurement.schemas import PurchaseRequestCreate, PurchaseRequestItemCreate
+    from app.modules.procurement.service import create_purchase_request
+    forecast = get_inventory_forecast(database, payload.days)
+    items = [PurchaseRequestItemCreate(inventory_item_id=item.inventory_item_id, quantity_requested=item.suggested_purchase_quantity) for item in forecast.items if item.suggested_purchase_quantity > 0]
+    if not items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No replenishment recommendations are currently required.")
+    return create_purchase_request(database, PurchaseRequestCreate(items=items), authentication.user)
 
 
 @router.post("/items", response_model=InventoryItemResponse, status_code=status.HTTP_201_CREATED)

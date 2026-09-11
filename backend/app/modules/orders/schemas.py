@@ -74,6 +74,19 @@ class OrderItemResponse(BaseModel):
     addons: list[OrderItemAddonResponse] = Field(default_factory=list)
 
 
+class OrderEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    order_event_id: int
+    order_id: int
+    previous_status: OrderStatus | None = None
+    new_status: OrderStatus
+    user_id: int | None = None
+    staff_actor_name: str | None = None
+    created_at: datetime
+    metadata_json: str | None = None
+
+
 class CustomerOrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -97,6 +110,7 @@ class CustomerOrderResponse(BaseModel):
     expires_at: datetime | None = None
     picked_up_at: datetime | None = None
     items: list[OrderItemResponse] = Field(default_factory=list)
+    events: list[OrderEventResponse] = Field(default_factory=list)
 
 
 class OrderTrackingResponse(BaseModel):
@@ -112,10 +126,12 @@ class OrderTrackingResponse(BaseModel):
     picked_up_at: datetime | None = None
     customer_name: str
     items: list[OrderItemResponse] = Field(default_factory=list)
+    events: list[OrderEventResponse] = Field(default_factory=list)
 
 
 class OrderStatusUpdateRequest(BaseModel):
     status: OrderStatus
+    metadata: str | dict | None = None
 
     @field_validator("status", mode="before")
     @classmethod

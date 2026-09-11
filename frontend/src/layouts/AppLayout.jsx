@@ -9,6 +9,7 @@ import {
 import { useAuth } from "../modules/auth/context/useAuth";
 import Sidebar from "../components/Sidebar";
 import ChangePasswordModal from "../modules/auth/components/ChangePasswordModal";
+import BranchSelector from "../modules/branches/components/BranchSelector";
 
 const pageTitles = {
   "/overview": "Overview",
@@ -107,6 +108,9 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* Multi-Branch Selector */}
+            <BranchSelector />
+
             {/* View Public Storefront Link */}
             <Link
               to="/"

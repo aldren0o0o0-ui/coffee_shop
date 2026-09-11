@@ -58,6 +58,9 @@ const navigationItems = [
     path: "/reports",
     roles: ["owner", "manager"],
   },
+  { label: "Register shift", path: "/shift", roles: ["owner", "manager", "cashier"] },
+  { label: "Recipe costing", path: "/costing", roles: ["owner", "manager"] },
+  { label: "Customers", path: "/customers", roles: ["owner", "manager", "cashier"] },
   {
     label: "Team",
     path: "/team",

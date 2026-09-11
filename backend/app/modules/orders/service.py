@@ -23,6 +23,7 @@ from app.modules.menu.models import (
 from app.modules.orders.models import (
     Order,
     OrderChannel,
+    OrderEvent,
     OrderItem,
     OrderItemAddon,
     OrderStatus,
@@ -72,6 +73,16 @@ def expire_stale_orders(database: Session) -> int:
     if count > 0:
         for order in stale_orders:
             order.order_status = OrderStatus.EXPIRED
+            database.add(
+                OrderEvent(
+                    order_id=order.order_id,
+                    previous_status=OrderStatus.AWAITING_PAYMENT,
+                    new_status=OrderStatus.EXPIRED,
+                    user_id=None,
+                    created_at=now,
+                    metadata_json='{"source": "expiry_sweep"}',
+                )
+            )
             if order.customer:
                 customers_service.record_customer_no_show(database, order.customer)
         database.commit()
@@ -256,6 +267,17 @@ def create_customer_order(
             )
             database.add(order_item_addon)
 
+    database.add(
+        OrderEvent(
+            order_id=order.order_id,
+            previous_status=None,
+            new_status=OrderStatus.AWAITING_PAYMENT,
+            user_id=None,
+            created_at=now,
+            metadata_json='{"source": "customer_order"}',
+        )
+    )
+
     database.commit()
     database.refresh(order)
 
@@ -299,11 +321,13 @@ def update_order_status(
     order_id: int,
     new_status: OrderStatus,
     current_user: User,
+    metadata: str | dict | None = None,
 ) -> Order:
     statement = (
         select(Order)
         .options(
             selectinload(Order.customer),
+            selectinload(Order.events),
             selectinload(Order.order_items).selectinload(OrderItem.menu_item),
             selectinload(Order.order_items).selectinload(OrderItem.menu_item_size),
             selectinload(Order.order_items).selectinload(OrderItem.addons).selectinload(OrderItemAddon.menu_item_addon),
@@ -349,9 +373,29 @@ def update_order_status(
                 detail="Baristas can only update orders to Preparing or Ready status.",
             )
 
+    previous_status = order.order_status
     order.order_status = new_status
     if new_status == OrderStatus.COMPLETED:
         order.picked_up_at = utc_now()
+
+    meta_str = None
+    if metadata is not None:
+        if isinstance(metadata, dict):
+            import json
+            meta_str = json.dumps(metadata)
+        else:
+            meta_str = str(metadata)
+
+    # Order-event implementation immediately after validated status update and before commit
+    event = OrderEvent(
+        order_id=order.order_id,
+        previous_status=previous_status,
+        new_status=new_status,
+        user_id=current_user.user_id if current_user else None,
+        created_at=utc_now(),
+        metadata_json=meta_str,
+    )
+    database.add(event)
 
     database.commit()
     database.refresh(order)
@@ -397,7 +441,17 @@ def get_order_for_tracking(
         and order.expires_at
         and as_utc(order.expires_at) < utc_now()
     ):
+        previous_status = order.order_status
         order.order_status = OrderStatus.EXPIRED
+        event = OrderEvent(
+            order_id=order.order_id,
+            previous_status=previous_status,
+            new_status=OrderStatus.EXPIRED,
+            user_id=None,
+            created_at=utc_now(),
+            metadata_json='{"reason": "tracking_lazy_expiry"}',
+        )
+        database.add(event)
         database.commit()
 
     return order
@@ -541,6 +595,17 @@ def create_pos_order(
         total_amount=total_amount,
         amount_tendered=payload.amount_tendered,
         now=now,
+    )
+
+    database.add(
+        OrderEvent(
+            order_id=order.order_id,
+            previous_status=None,
+            new_status=OrderStatus.CONFIRMED,
+            user_id=staff_user.user_id,
+            created_at=now,
+            metadata_json='{"source": "pos_order"}',
+        )
     )
 
     database.commit()

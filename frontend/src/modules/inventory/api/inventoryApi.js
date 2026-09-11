@@ -31,3 +31,13 @@ export async function fetchInventoryTransactions(limit = 50, itemId = null) {
   const response = await apiClient.get("/inventory/transactions", { params });
   return response.data;
 }
+
+export async function fetchInventoryForecast(days = 7) {
+  const response = await apiClient.get("/inventory/forecast", { params: { days } });
+  return response.data;
+}
+
+export async function createForecastPurchaseRequest(days = 7) {
+  const response = await apiClient.post("/inventory/forecast/purchase-request", { days });
+  return response.data;
+}

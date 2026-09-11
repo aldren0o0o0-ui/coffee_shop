@@ -300,6 +300,20 @@ export default function CustomerTrackingPage() {
                   </div>
                 </div>
               )}
+
+              {/* One-Tap Reorder Action */}
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="font-extrabold text-amber-950 block">Love this order? Reorder in one tap!</span>
+                  <span className="text-[11px] text-amber-800">Instantly validates live menu prices and ingredient availability.</span>
+                </div>
+                <Link
+                  to={`/order`}
+                  className="rounded-xl bg-amber-900 px-4 py-2 font-black text-white hover:bg-amber-800 transition shadow-xs whitespace-nowrap"
+                >
+                  🔁 Reorder Items
+                </Link>
+              </div>
             </div>
           )}
         </div>

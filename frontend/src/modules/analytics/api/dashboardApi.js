@@ -1,7 +1,8 @@
 import apiClient from "../../../api/client";
 
-export async function fetchDashboardOverview() {
-  const response = await apiClient.get("/dashboard/overview");
+export async function fetchDashboardOverview(branchId = null) {
+  const params = branchId ? { branch_id: branchId } : {};
+  const response = await apiClient.get("/dashboard/overview", { params });
   return response.data;
 }
 

@@ -10,6 +10,8 @@ from app.modules.auth.dependencies import (
 from app.modules.customers import service
 from app.modules.customers.schemas import (
     CustomerBlockRequest,
+    CustomerMetricsResponse,
+    CustomerPreferencesUpdate,
     CustomerResponse,
     CustomerUpdateRequest,
     LoyaltyAdjustmentRequest,
@@ -56,6 +58,15 @@ def get_customer(
             detail="Customer not found.",
         )
     return customer
+
+
+@router.get("/{customer_id}/metrics", response_model=CustomerMetricsResponse)
+def get_customer_metrics(customer_id: int, database: DatabaseDependency, current_auth: CurrentAuthenticationDependency) -> CustomerMetricsResponse:
+    return service.get_customer_metrics(database, customer_id)
+
+@router.put("/{customer_id}/preferences", response_model=CustomerResponse)
+def update_customer_preferences(customer_id: int, payload: CustomerPreferencesUpdate, database: DatabaseDependency, current_auth: CurrentAuthenticationDependency) -> CustomerResponse:
+    return service.update_customer_preferences(database, customer_id, payload.dietary_notes, payload.favorite_item_notes, payload.marketing_consent)
 
 
 @router.patch("/{customer_id}", response_model=CustomerResponse)

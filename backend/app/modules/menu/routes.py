@@ -3,13 +3,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.modules.auth.dependencies import CurrentAuthenticationDependency
+from app.modules.inventory.schemas import InventoryOption
 from app.modules.menu.models import (
     MenuCategory,
     MenuItem,
     MenuItemIngredient,
 )
 from app.modules.menu.schemas import (
-    InventoryOption,
     MenuCategoryCatalog,
     MenuCategoryCreateRequest,
     MenuItemAvailabilityUpdateRequest,

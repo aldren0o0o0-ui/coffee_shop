@@ -32,6 +32,14 @@ class User(TimestampMixin, Base):
         autoincrement=True,
     )
 
+    branch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("branches.branch_id"),
+        default=1,
+        server_default="1",
+        nullable=True,
+        index=True,
+    )
+
     username: Mapped[str] = mapped_column(
         String(50),
         unique=True,

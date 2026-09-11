@@ -12,6 +12,15 @@ from app.core.config import settings
 from app.modules.analytics.routes import router as dashboard_router
 from app.modules.auth.routes import router as auth_router
 from app.modules.customers.routes import router as customers_router
+from app.modules.branches.routes import router as branches_router
+from app.modules.costing.routes import router as costing_router
+from app.modules.fulfilment.routes import (
+    customer_fulfilment_router,
+    router as fulfilment_router,
+)
+from app.modules.notifications.routes import router as notifications_router
+from app.modules.shifts.routes import router as shifts_router
+from app.modules.engagement.routes import router as engagement_router
 from app.modules.inventory.routes import router as inventory_router
 from app.modules.menu.jobs import run_draft_cleanup_loop
 from app.modules.menu.routes import router as menu_router
@@ -53,7 +62,9 @@ app = FastAPI(
 # through the dedicated, authenticated route in the payments module.
 app.mount("/uploads/menu", StaticFiles(directory="uploads/menu"), name="menu-uploads")
 
-RECEIPTS_DIR = Path("uploads/receipts").resolve()
+from app.modules.payments.receipt import RECEIPTS_DIR as PAYMENTS_RECEIPTS_DIR
+
+RECEIPTS_DIR = Path(PAYMENTS_RECEIPTS_DIR).resolve()
 
 
 @app.get("/uploads/receipts/{filename}", include_in_schema=False)
@@ -85,7 +96,14 @@ app.include_router(menu_router, prefix="/api/v1")
 app.include_router(inventory_router, prefix="/api/v1")
 app.include_router(procurement_router, prefix="/api/v1")
 app.include_router(customers_router, prefix="/api/v1")
+app.include_router(costing_router, prefix="/api/v1")
+app.include_router(shifts_router, prefix="/api/v1")
+app.include_router(engagement_router, prefix="/api/v1")
 app.include_router(payments_router, prefix="/api/v1")
+app.include_router(fulfilment_router, prefix="/api/v1")
+app.include_router(customer_fulfilment_router, prefix="/api/v1")
+app.include_router(branches_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
 
 
 @app.get("/")
