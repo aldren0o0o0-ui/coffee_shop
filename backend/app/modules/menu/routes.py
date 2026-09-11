@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -6,10 +6,7 @@ from app.modules.auth.dependencies import CurrentAuthenticationDependency
 from app.modules.menu.models import (
     MenuCategory,
     MenuItem,
-    MenuItemAddon,
-    MenuItemImage,
     MenuItemIngredient,
-    MenuItemSize,
 )
 from app.modules.menu.schemas import (
     InventoryOption,

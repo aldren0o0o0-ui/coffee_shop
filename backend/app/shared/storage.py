@@ -1,6 +1,7 @@
 import os
 import uuid
 from pathlib import Path
+
 from fastapi import HTTPException, status
 
 BASE_UPLOAD_DIR = Path("uploads/menu")

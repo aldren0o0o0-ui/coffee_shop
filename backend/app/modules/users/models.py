@@ -8,8 +8,8 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     String,
-    UniqueConstraint,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -83,30 +83,30 @@ class User(TimestampMixin, Base):
         nullable=True,
     )
 
-    user_roles: Mapped[list["UserRole"]] = relationship(
+    user_roles: Mapped[list[UserRole]] = relationship(
         "UserRole",
         back_populates="user",
     )
 
-    orders: Mapped[list["Order"]] = relationship(
+    orders: Mapped[list[Order]] = relationship(
         "Order",
         back_populates="staff_user",
         foreign_keys="Order.user_id",
     )
 
-    purchase_requests: Mapped[list["PurchaseRequest"]] = relationship(
+    purchase_requests: Mapped[list[PurchaseRequest]] = relationship(
         "PurchaseRequest",
         back_populates="requester",
         foreign_keys="PurchaseRequest.requested_by",
     )
 
-    inventory_transactions: Mapped[list["InventoryTransaction"]] = relationship(
+    inventory_transactions: Mapped[list[InventoryTransaction]] = relationship(
         "InventoryTransaction",
         back_populates="creator",
         foreign_keys="InventoryTransaction.created_by",
     )
 
-    auth_sessions: Mapped[list["AuthSession"]] = relationship(
+    auth_sessions: Mapped[list[AuthSession]] = relationship(
         "AuthSession",
         back_populates="user",
         cascade="all, delete-orphan",
@@ -138,7 +138,7 @@ class Role(TimestampMixin, Base):
         nullable=False,
     )
 
-    user_roles: Mapped[list["UserRole"]] = relationship(
+    user_roles: Mapped[list[UserRole]] = relationship(
         "UserRole",
         back_populates="role",
     )
@@ -190,12 +190,12 @@ class UserRole(Base):
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship(
+    user: Mapped[User] = relationship(
         "User",
         back_populates="user_roles",
     )
 
-    role: Mapped["Role"] = relationship(
+    role: Mapped[Role] = relationship(
         "Role",
         back_populates="user_roles",
     )

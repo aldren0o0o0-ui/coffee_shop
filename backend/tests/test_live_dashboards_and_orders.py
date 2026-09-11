@@ -1,19 +1,25 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.database.session import SessionLocal
-from app.modules.customers.models import Customer
-from app.modules.inventory.models import InventoryItem
-from app.modules.menu.models import MenuCategory, MenuItem, MenuItemSize, MenuItemAddon, MenuItemIngredient
-from app.modules.orders.models import Order, OrderStatus
-from app.modules.orders.service import expire_stale_orders
-from app.modules.payments.models import Payment, PaymentMethod, PaymentStatus
-from app.modules.users.models import Role, User, UserRole
 from app.core.rate_limit import limiter
 from app.core.security import hash_password
+from app.database.session import SessionLocal
+from app.main import app
+from app.modules.customers.models import Customer
+from app.modules.inventory.models import InventoryItem
+from app.modules.menu.models import (
+    MenuCategory,
+    MenuItem,
+    MenuItemAddon,
+    MenuItemIngredient,
+    MenuItemSize,
+)
+from app.modules.orders.models import Order, OrderStatus
+from app.modules.orders.service import expire_stale_orders
+from app.modules.users.models import Role, User, UserRole
 
 client = TestClient(app)
 

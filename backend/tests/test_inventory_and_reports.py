@@ -1,26 +1,24 @@
 import uuid
-from datetime import datetime, timezone
 from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.core.rate_limit import limiter
+from app.core.security import hash_password
 from app.database.session import SessionLocal
+from app.main import app
+from app.modules.analytics.service import generate_store_reports
 from app.modules.inventory.models import (
-    InventoryItem,
-    InventoryTransaction,
     InventoryTransactionType,
 )
+from app.modules.inventory.schemas import InventoryItemCreate
 from app.modules.inventory.service import (
     adjust_inventory_stock,
     create_inventory_item,
     list_inventory_transactions,
 )
-from app.modules.inventory.schemas import InventoryItemCreate
-from app.modules.analytics.service import generate_store_reports
 from app.modules.users.models import Role, User, UserRole
-from app.core.security import hash_password
-from app.core.rate_limit import limiter
 
 client = TestClient(app)
 

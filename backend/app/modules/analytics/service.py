@@ -4,30 +4,6 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.modules.customers.models import Customer
-from app.modules.inventory.models import (
-    InventoryItem,
-    InventoryTransaction,
-    InventoryTransactionType,
-)
-from app.modules.menu.models import (
-    MenuItem,
-    MenuItemAddon,
-    MenuItemIngredient,
-    MenuItemSize,
-)
-from app.modules.orders.models import (
-    Order,
-    OrderItem,
-    OrderItemAddon,
-    OrderStatus,
-)
-from app.modules.payments.models import Payment, PaymentStatus
-from app.modules.procurement.models import (
-    PurchaseRequest,
-    PurchaseRequestStatus,
-)
-from app.modules.users.models import User, UserRole
 from app.modules.analytics.schemas import (
     BaristaDashboardStats,
     BaristaTicket,
@@ -47,14 +23,44 @@ from app.modules.analytics.schemas import (
     TimelinePoint,
     TopSellingItem,
 )
+from app.modules.inventory.models import (
+    InventoryItem,
+    InventoryTransaction,
+)
+from app.modules.menu.models import (
+    MenuItem,
+    MenuItemIngredient,
+)
+from app.modules.orders.models import (
+    Order,
+    OrderItem,
+    OrderItemAddon,
+    OrderStatus,
+)
+from app.modules.payments.models import Payment, PaymentStatus
+from app.modules.procurement.models import (
+    PurchaseRequest,
+    PurchaseRequestStatus,
+)
+from app.modules.users.models import User, UserRole
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def get_store_timezone():
+    try:
+        import zoneinfo
+        return zoneinfo.ZoneInfo("Asia/Manila")
+    except Exception:
+        local_tz = datetime.now().astimezone().tzinfo
+        return local_tz or timezone.utc
+
+
 def get_today_start() -> datetime:
-    return utc_now().replace(hour=0, minute=0, second=0, microsecond=0)
+    store_tz = get_store_timezone()
+    return datetime.now(store_tz).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def get_owner_dashboard_stats(database: Session) -> OwnerDashboardStats:
@@ -379,7 +385,10 @@ def get_barista_queue(database: Session) -> BaristaDashboardStats:
 
     tickets = []
     for o in queue_orders:
-        elapsed = max(int((now - o.order_date).total_seconds() / 60), 0)
+        order_date = o.order_date
+        if order_date.tzinfo is None:
+            order_date = order_date.replace(tzinfo=timezone.utc)
+        elapsed = max(int((now - order_date).total_seconds() / 60), 0)
         items = []
         for oi in o.order_items:
             addons_list = [a.menu_item_addon.addon_name for a in oi.addons if a.menu_item_addon]
@@ -543,18 +552,19 @@ def generate_store_reports(database: Session, period: str = "today") -> StoreRep
     """
     Generates consolidated reporting analytics for Manager and Owner roles.
     """
-    now = utc_now()
+    store_tz = get_store_timezone()
+    now_local = datetime.now(store_tz)
     if period == "today":
-        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_date = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "this_week":
-        start_date = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        start_date = (now_local - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "this_month":
-        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start_date = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     elif period == "all_time":
         start_date = None
     else:
         period = "today"
-        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_date = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
 
     valid_statuses = [
         OrderStatus.CONFIRMED,
@@ -588,6 +598,39 @@ def generate_store_reports(database: Session, period: str = "today") -> StoreRep
         round(total_revenue / Decimal(completed_orders_count), 2)
         if completed_orders_count > 0
         else Decimal("0.00")
+    )
+
+    # 3. Estimated Cost of Goods Sold (COGS) & Gross Profit
+    cogs_stmt = (
+        select(
+            func.coalesce(
+                func.sum(
+                    OrderItem.quantity
+                    * MenuItemIngredient.quantity_required
+                    * InventoryItem.unit_cost
+                ),
+                Decimal("0.00"),
+            )
+        )
+        .select_from(OrderItem)
+        .join(Order, OrderItem.order_id == Order.order_id)
+        .join(
+            MenuItemIngredient,
+            OrderItem.menu_item_id == MenuItemIngredient.menu_item_id,
+        )
+        .join(
+            InventoryItem,
+            MenuItemIngredient.inventory_item_id == InventoryItem.inventory_item_id,
+        )
+        .where(*order_filter)
+    )
+    estimated_cogs = database.scalar(cogs_stmt) or Decimal("0.00")
+    estimated_cogs = round(estimated_cogs, 2)
+    gross_profit = max(total_revenue - estimated_cogs, Decimal("0.00"))
+    profit_margin = (
+        round(float((gross_profit / total_revenue) * 100), 1)
+        if total_revenue > 0
+        else 0.0
     )
 
     # 3. Top selling items
@@ -659,49 +702,71 @@ def generate_store_reports(database: Session, period: str = "today") -> StoreRep
         for row in pm_rows
     ]
 
-    # 6. Timeline
-    timeline = []
+    # 6. Timeline Generation
+    slots: list[tuple[str, datetime, datetime]] = []
     if period == "today":
-        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        for hour in range(6, 24, 3):
-            t_start = day_start + timedelta(hours=hour)
-            t_end = t_start + timedelta(hours=3)
-            slot_stmt = select(
-                func.coalesce(func.sum(Order.total_amount), Decimal("0.00")),
-                func.count(Order.order_id),
-            ).where(
-                Order.order_status.in_(valid_statuses),
-                Order.order_date >= t_start,
-                Order.order_date < t_end,
-            )
-            slot_rev, slot_cnt = database.execute(slot_stmt).one()
-            timeline.append(
-                TimelinePoint(
-                    label=f"{hour:02d}:00",
-                    sales=slot_rev or Decimal("0.00"),
-                    orders_count=slot_cnt or 0,
-                )
-            )
+        day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        for hour in range(0, 24, 2):
+            slot_start = day_start + timedelta(hours=hour)
+            slot_end = slot_start + timedelta(hours=2)
+            slots.append((f"{hour:02d}:00", slot_start, slot_end))
+    elif period == "this_week":
+        for i in range(6, -1, -1):
+            slot_start = (now_local - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+            slot_end = slot_start + timedelta(days=1)
+            slots.append((slot_start.strftime("%a %d"), slot_start, slot_end))
+    elif period == "this_month":
+        for day in range(1, now_local.day + 1):
+            slot_start = now_local.replace(day=day, hour=0, minute=0, second=0, microsecond=0)
+            slot_end = slot_start + timedelta(days=1)
+            slots.append((slot_start.strftime("%b %d"), slot_start, slot_end))
+    elif period == "all_time":
+        current_year = now_local.year
+        current_month = now_local.month
+        for m_offset in range(5, -1, -1):
+            m = current_month - m_offset
+            y = current_year
+            while m <= 0:
+                m += 12
+                y -= 1
+            slot_start = datetime(y, m, 1, 0, 0, 0, tzinfo=store_tz)
+            if m == 12:
+                slot_end = datetime(y + 1, 1, 1, 0, 0, 0, tzinfo=store_tz)
+            else:
+                slot_end = datetime(y, m + 1, 1, 0, 0, 0, tzinfo=store_tz)
+            slots.append((slot_start.strftime("%b '%y"), slot_start, slot_end))
     else:
         for i in range(6, -1, -1):
-            day_cursor = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
-            next_day = day_cursor + timedelta(days=1)
-            slot_stmt = select(
-                func.coalesce(func.sum(Order.total_amount), Decimal("0.00")),
-                func.count(Order.order_id),
-            ).where(
-                Order.order_status.in_(valid_statuses),
-                Order.order_date >= day_cursor,
-                Order.order_date < next_day,
+            slot_start = (now_local - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+            slot_end = slot_start + timedelta(days=1)
+            slots.append((slot_start.strftime("%a %d"), slot_start, slot_end))
+
+    # Single-query timeline aggregation for speed and accuracy
+    timeline_filter = [Order.order_status.in_(valid_statuses)]
+    if slots:
+        timeline_filter.append(Order.order_date >= slots[0][1])
+        timeline_filter.append(Order.order_date < slots[-1][2])
+
+    timeline_stmt = select(Order.order_date, Order.total_amount).where(*timeline_filter)
+    timeline_orders = database.execute(timeline_stmt).all()
+
+    timeline: list[TimelinePoint] = []
+    for label, slot_start, slot_end in slots:
+        slot_sales = Decimal("0.00")
+        slot_cnt = 0
+        for o_date, o_amt in timeline_orders:
+            if o_date is not None:
+                o_dt = o_date if o_date.tzinfo is not None else o_date.replace(tzinfo=store_tz)
+                if slot_start <= o_dt < slot_end:
+                    slot_sales += o_amt or Decimal("0.00")
+                    slot_cnt += 1
+        timeline.append(
+            TimelinePoint(
+                label=label,
+                sales=slot_sales,
+                orders_count=slot_cnt,
             )
-            slot_rev, slot_cnt = database.execute(slot_stmt).one()
-            timeline.append(
-                TimelinePoint(
-                    label=day_cursor.strftime("%a %d"),
-                    sales=slot_rev or Decimal("0.00"),
-                    orders_count=slot_cnt or 0,
-                )
-            )
+        )
 
     return StoreReportResponse(
         period=period,
@@ -709,6 +774,9 @@ def generate_store_reports(database: Session, period: str = "today") -> StoreRep
         total_orders_count=total_orders_count,
         completed_orders_count=completed_orders_count,
         average_order_value=aov,
+        estimated_cogs=estimated_cogs,
+        gross_profit=gross_profit,
+        profit_margin_percentage=profit_margin,
         top_selling_items=top_selling_items,
         sales_by_channel=sales_by_channel,
         sales_by_payment_method=sales_by_payment_method,

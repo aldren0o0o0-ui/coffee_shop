@@ -26,3 +26,7 @@ Thumbs.db
 *.log
 coverage/
 htmlcov/
+
+# Runtime-generated customer documents and test artifacts
+backend/uploads/receipts/
+backend/tests/.test_database.sqlite3

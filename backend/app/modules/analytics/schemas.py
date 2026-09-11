@@ -1,6 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
+
 from app.modules.orders.models import OrderChannel, OrderStatus, OrderType
 
 
@@ -148,6 +150,9 @@ class StoreReportResponse(BaseModel):
     total_orders_count: int
     completed_orders_count: int
     average_order_value: Decimal
+    estimated_cogs: Decimal = Decimal("0.00")
+    gross_profit: Decimal = Decimal("0.00")
+    profit_margin_percentage: float = 0.0
     top_selling_items: list[TopSellingItem]
     sales_by_channel: list[ChannelSales]
     sales_by_payment_method: list[PaymentMethodSales]

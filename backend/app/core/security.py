@@ -3,7 +3,6 @@ import secrets
 
 from pwdlib import PasswordHash
 
-
 password_hasher = PasswordHash.recommended()
 
 SESSION_TOKEN_BYTES = 32

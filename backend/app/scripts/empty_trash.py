@@ -1,7 +1,8 @@
+from sqlalchemy.orm import selectinload
+
 from app.database.session import SessionLocal
 from app.modules.menu.models import MenuItem
 from app.shared.storage import delete_file_by_url
-from sqlalchemy.orm import selectinload
 
 
 def purge_trash():

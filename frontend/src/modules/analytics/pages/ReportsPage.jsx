@@ -103,7 +103,8 @@ export default function ReportsPage() {
       ) : report ? (
         <>
           {/* Executive KPI Cards */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* 1. Gross Revenue */}
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
               <p className="text-xs font-medium uppercase tracking-wider text-stone-500">
                 Gross Revenue
@@ -116,6 +117,38 @@ export default function ReportsPage() {
               </p>
             </div>
 
+            {/* 2. Cost of Goods Sold (COGS) */}
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
+              <p className="text-xs font-medium uppercase tracking-wider text-stone-500">
+                Cost of Goods Sold (COGS)
+              </p>
+              <p className="mt-2 text-2xl font-bold text-stone-900">
+                {formatCurrency(report.estimated_cogs || 0)}
+              </p>
+              <p className="mt-1 text-xs text-stone-500">
+                Direct ingredient recipe costs
+              </p>
+            </div>
+
+            {/* 3. Gross Profit & Margin */}
+            <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/50 to-white p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wider text-emerald-900">
+                  Gross Profit
+                </p>
+                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                  {report.profit_margin_percentage || 0}% Margin
+                </span>
+              </div>
+              <p className="mt-2 text-2xl font-bold text-emerald-950">
+                {formatCurrency(report.gross_profit || 0)}
+              </p>
+              <p className="mt-1 text-xs font-medium text-emerald-700">
+                Net earnings after recipe cost
+              </p>
+            </div>
+
+            {/* 4. Completed Orders */}
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
               <p className="text-xs font-medium uppercase tracking-wider text-stone-500">
                 Completed Orders
@@ -128,6 +161,7 @@ export default function ReportsPage() {
               </p>
             </div>
 
+            {/* 5. Average Order Value */}
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
               <p className="text-xs font-medium uppercase tracking-wider text-stone-500">
                 Average Order Value
@@ -140,6 +174,7 @@ export default function ReportsPage() {
               </p>
             </div>
 
+            {/* 6. Fulfillment Rate */}
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-xs">
               <p className="text-xs font-medium uppercase tracking-wider text-stone-500">
                 Fulfillment Rate
@@ -168,8 +203,12 @@ export default function ReportsPage() {
                 </h3>
                 <p className="text-xs text-stone-500">
                   {period === "today"
-                    ? "Hourly breakdown throughout the business day"
-                    : "Daily volume overview"}
+                    ? "2-hour intervals throughout the business day"
+                    : period === "this_week"
+                    ? "Daily volume overview over the last 7 days"
+                    : period === "this_month"
+                    ? "Daily breakdown for the current month"
+                    : "Monthly volume overview"}
                 </p>
               </div>
               <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-600">
@@ -178,47 +217,82 @@ export default function ReportsPage() {
             </div>
 
             {report.timeline.length === 0 ? (
-              <p className="py-10 text-center text-xs text-stone-400">
+              <p className="py-12 text-center text-xs text-stone-400">
                 No chronological activity logged for this time window.
               </p>
             ) : (
-              <div className="mt-6 flex h-48 items-end gap-2 pt-4 sm:gap-4">
-                {report.timeline.map((point, idx) => {
-                  const sales = parseFloat(point.sales);
-                  const heightPercent =
-                    maxTimelineSales > 0
-                      ? Math.max(Math.round((sales / maxTimelineSales) * 100), 4)
-                      : 4;
-
-                  return (
-                    <div
-                      className="group flex flex-1 flex-col items-center gap-1.5"
-                      key={idx}
-                    >
-                      {/* Tooltip on hover */}
-                      <div className="opacity-0 transition-opacity group-hover:opacity-100 text-center">
-                        <span className="rounded-md bg-amber-950 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
-                          {formatCurrency(sales)}
-                        </span>
-                      </div>
-
-                      {/* Bar */}
-                      <div className="w-full rounded-t-lg bg-amber-100 transition-all group-hover:bg-amber-800" style={{ height: `${heightPercent}%` }}>
-                        <div
-                          className="h-full w-full rounded-t-lg bg-amber-800/80 transition group-hover:bg-amber-900"
-                          style={{
-                            height: sales > 0 ? "100%" : "0%",
-                          }}
-                        />
-                      </div>
-
-                      {/* Label */}
-                      <span className="text-[10px] font-semibold text-stone-500 truncate w-full text-center">
-                        {point.label}
+              <div className="mt-6">
+                {/* Chart container with reference grid */}
+                <div className="relative h-56 w-full pt-6 pb-2">
+                  {/* Dashed Horizontal Gridlines */}
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-7">
+                    <div className="flex items-center gap-2 border-b border-dashed border-stone-200 w-full">
+                      <span className="text-[10px] text-stone-400 font-mono -mt-2.5">
+                        {formatCurrency(maxTimelineSales)}
                       </span>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-2 border-b border-dashed border-stone-200 w-full">
+                      <span className="text-[10px] text-stone-400 font-mono -mt-2.5">
+                        {formatCurrency(maxTimelineSales / 2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 border-b border-stone-200 w-full">
+                      <span className="text-[10px] text-stone-400 font-mono -mt-2.5">
+                        {formatCurrency(0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bars Container */}
+                  <div className="relative flex h-full items-end gap-1.5 sm:gap-3 pl-14 z-10">
+                    {report.timeline.map((point, idx) => {
+                      const sales = parseFloat(point.sales);
+                      const heightPercent =
+                        maxTimelineSales > 0
+                          ? Math.round((sales / maxTimelineSales) * 100)
+                          : 0;
+
+                      return (
+                        <div
+                          className="group relative flex flex-1 flex-col items-center h-full justify-end"
+                          key={idx}
+                        >
+                          {/* Floating Tooltip */}
+                          <div className="absolute bottom-full mb-2 pointer-events-none opacity-0 transition-all duration-150 group-hover:opacity-100 group-hover:-translate-y-1 z-20 whitespace-nowrap">
+                            <div className="rounded-lg bg-stone-900 px-2.5 py-1 text-center shadow-lg">
+                              <p className="text-[11px] font-bold text-white">
+                                {formatCurrency(sales)}
+                              </p>
+                              <p className="text-[9px] text-stone-300 font-medium">
+                                {point.orders_count}{" "}
+                                {point.orders_count === 1 ? "order" : "orders"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Bar Track & Fill */}
+                          <div className="w-full flex-1 flex items-end justify-center pb-1">
+                            <div
+                              className={`w-full max-w-[42px] rounded-t-md transition-all duration-300 ${
+                                sales > 0
+                                  ? "bg-gradient-to-t from-amber-900 to-amber-700 group-hover:from-amber-800 group-hover:to-amber-600 shadow-xs"
+                                  : "bg-stone-100 group-hover:bg-stone-200"
+                              }`}
+                              style={{
+                                height: `${Math.max(heightPercent, sales > 0 ? 6 : 2)}%`,
+                              }}
+                            />
+                          </div>
+
+                          {/* X-axis Label */}
+                          <span className="text-[10px] font-semibold text-stone-500 truncate w-full text-center group-hover:text-stone-900">
+                            {point.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </div>

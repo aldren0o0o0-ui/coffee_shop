@@ -17,12 +17,10 @@ from app.modules.users.models import User, UserRole
 
 class IncorrectCurrentPasswordError(Exception):
     """Raised when the provided current password is wrong."""
-    pass
 
 
 class SamePasswordError(Exception):
     """Raised when the new password is the same as the old password."""
-    pass
 
 
 def utc_now() -> datetime:

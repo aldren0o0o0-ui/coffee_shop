@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +28,18 @@ class Settings(BaseSettings):
     smtp_tls: bool = True
     smtp_ssl: bool = False
 
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, value: object) -> object:
+        """Accept common deployment labels while keeping a boolean setting internally."""
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "production", "prod"}:
+                return False
+            if normalized in {"development", "dev"}:
+                return True
+        return value
+
     @property
     def cors_origins(self) -> list[str]:
         raw_origins = [o.strip() for o in self.frontend_url.split(",") if o.strip()]
@@ -39,7 +51,9 @@ class Settings(BaseSettings):
             "http://localhost:5174",
             "http://127.0.0.1:5174",
         ]
-        return list(dict.fromkeys(raw_origins + dev_origins))
+        if self.app_env.lower() in {"development", "dev", "test", "testing"} or self.debug:
+            raw_origins.extend(dev_origins)
+        return list(dict.fromkeys(raw_origins))
 
     model_config = SettingsConfigDict(
         env_file=".env",

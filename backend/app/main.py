@@ -1,27 +1,30 @@
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.health import router as health_router
-from app.modules.auth.routes import router as auth_router
-from app.modules.users.routes import router as team_router
+from app.core.config import settings
 from app.modules.analytics.routes import router as dashboard_router
+from app.modules.auth.routes import router as auth_router
+from app.modules.customers.routes import router as customers_router
+from app.modules.inventory.routes import router as inventory_router
+from app.modules.menu.jobs import run_draft_cleanup_loop
+from app.modules.menu.routes import router as menu_router
+from app.modules.orders.jobs import run_order_expiry_sweep_loop
 from app.modules.orders.routes import (
     customer_router,
+)
+from app.modules.orders.routes import (
     router as orders_router,
 )
-from app.modules.menu.routes import router as menu_router
-from app.modules.inventory.routes import router as inventory_router
-from app.modules.procurement.routes import router as procurement_router
-from app.modules.customers.routes import router as customers_router
 from app.modules.payments.routes import router as payments_router
-from app.modules.orders.jobs import run_order_expiry_sweep_loop
-from app.modules.menu.jobs import run_draft_cleanup_loop
-
-from app.core.config import settings
+from app.modules.procurement.routes import router as procurement_router
+from app.modules.users.routes import router as team_router
 
 # Ensure upload directory exists
 Path("uploads/menu").mkdir(parents=True, exist_ok=True)
@@ -46,8 +49,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Serve uploaded static media
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Only menu images are public. Receipts can contain customer data and are served
+# through the dedicated, authenticated route in the payments module.
+app.mount("/uploads/menu", StaticFiles(directory="uploads/menu"), name="menu-uploads")
+
+RECEIPTS_DIR = Path("uploads/receipts").resolve()
+
+
+@app.get("/uploads/receipts/{filename}", include_in_schema=False)
+def download_receipt(filename: str) -> FileResponse:
+    """Serve only unguessable receipt files; reject traversal and other files."""
+    if Path(filename).name != filename or not filename.endswith(".pdf"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found.")
+    receipt_path = (RECEIPTS_DIR / filename).resolve()
+    if RECEIPTS_DIR not in receipt_path.parents or not receipt_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found.")
+    return FileResponse(receipt_path, media_type="application/pdf", filename="receipt.pdf")
 
 app.add_middleware(
     CORSMiddleware,
@@ -75,4 +92,4 @@ app.include_router(payments_router, prefix="/api/v1")
 def root() -> dict[str, str]:
     return {
         "message": "Welcome to ldrn's Coffee Shop Management System API!"
-    }
+    }

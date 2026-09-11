@@ -9,13 +9,15 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
-    Enum as SqlEnum,
     ForeignKey,
     Integer,
     Numeric,
     String,
     Text,
     func,
+)
+from sqlalchemy import (
+    Enum as SqlEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,8 +26,8 @@ from app.shared.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.menu.models import MenuItemIngredient
-    from app.modules.users.models import User
     from app.modules.procurement.models import PurchaseRequestItem
+    from app.modules.users.models import User
 
 
 class InventoryTransactionType(str, Enum):
@@ -97,17 +99,17 @@ class InventoryItem(TimestampMixin, Base):
         nullable=False,
     )
 
-    menu_item_ingredients: Mapped[list["MenuItemIngredient"]] = relationship(
+    menu_item_ingredients: Mapped[list[MenuItemIngredient]] = relationship(
         "MenuItemIngredient",
         back_populates="inventory_item",
     )
 
-    inventory_transactions: Mapped[list["InventoryTransaction"]] = relationship(
+    inventory_transactions: Mapped[list[InventoryTransaction]] = relationship(
         "InventoryTransaction",
         back_populates="inventory_item",
     )
 
-    purchase_request_items: Mapped[list["PurchaseRequestItem"]] = relationship(
+    purchase_request_items: Mapped[list[PurchaseRequestItem]] = relationship(
         "PurchaseRequestItem",
         back_populates="inventory_item",
     )
@@ -191,12 +193,12 @@ class InventoryTransaction(Base):
         nullable=False,
     )
 
-    inventory_item: Mapped["InventoryItem"] = relationship(
+    inventory_item: Mapped[InventoryItem] = relationship(
         "InventoryItem",
         back_populates="inventory_transactions",
     )
 
-    creator: Mapped["User"] = relationship(
+    creator: Mapped[User] = relationship(
         "User",
         back_populates="inventory_transactions",
         foreign_keys=[created_by],

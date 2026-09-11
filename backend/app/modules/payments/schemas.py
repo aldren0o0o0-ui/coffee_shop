@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.modules.payments.models import PaymentMethod, PaymentStatus

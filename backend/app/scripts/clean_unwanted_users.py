@@ -1,8 +1,8 @@
 from app.database.session import SessionLocal
-from app.modules.users.models import User, UserRole
-from app.modules.orders.models import Order
 from app.modules.inventory.models import InventoryTransaction
+from app.modules.orders.models import Order
 from app.modules.procurement.models import PurchaseRequest
+from app.modules.users.models import User, UserRole
 
 
 def clean_users():

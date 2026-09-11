@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
-    Enum as SqlEnum,
     ForeignKey,
-    Integer,
     Numeric,
     String,
     Text,
+)
+from sqlalchemy import (
+    Enum as SqlEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -130,7 +131,7 @@ class Payment(TimestampMixin, Base):
         nullable=True,
     )
 
-    order: Mapped["Order"] = relationship(
+    order: Mapped[Order] = relationship(
         "Order",
         back_populates="payments",
     )

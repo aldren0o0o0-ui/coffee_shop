@@ -38,7 +38,7 @@ def clear_recent_dispatched_emails() -> None:
         RECENT_DISPATCHED_EMAILS.clear()
 
 
-def format_currency(val: Decimal | float | int | None) -> str:
+def format_currency(val: Decimal | float | None) -> str:
     if val is None:
         return "₱0.00"
     return f"₱{float(val):,.2f}"

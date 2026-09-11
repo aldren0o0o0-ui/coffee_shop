@@ -1,5 +1,8 @@
 from app.database.session import SessionLocal
-from app.modules.menu.models import MenuCategory, MenuItem, MenuItemImage, MenuItemSize, MenuItemAddon, MenuItemIngredient
+from app.modules.menu.models import (
+    MenuCategory,
+    MenuItem,
+)
 from app.shared.storage import delete_file_by_url
 
 

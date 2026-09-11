@@ -1,22 +1,18 @@
 import uuid
 from decimal import Decimal
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.main import app
+from app.core.security import hash_password
 from app.database.session import SessionLocal
+from app.main import app
 from app.modules.inventory.models import (
     InventoryItem,
     InventoryTransaction,
     InventoryTransactionType,
 )
-from app.modules.procurement.models import (
-    PurchaseRequest,
-    PurchaseRequestItem,
-    PurchaseRequestStatus,
-)
 from app.modules.users.models import Role, User, UserRole
-from app.core.security import hash_password
 
 client = TestClient(app)
 

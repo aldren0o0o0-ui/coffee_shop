@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
-    Enum as SqlEnum,
     ForeignKey,
     Index,
     Integer,
@@ -17,6 +16,9 @@ from sqlalchemy import (
     Text,
     func,
 )
+from sqlalchemy import (
+    Enum as SqlEnum,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -24,9 +26,9 @@ from app.shared.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.modules.customers.models import Customer, LoyaltyTransaction
-    from app.modules.users.models import User
     from app.modules.menu.models import MenuItem, MenuItemAddon, MenuItemSize
     from app.modules.payments.models import Payment
+    from app.modules.users.models import User
 
 
 class OrderChannel(str, Enum):
@@ -205,28 +207,28 @@ class Order(TimestampMixin, Base):
         nullable=True,
     )
 
-    customer: Mapped["Customer | None"] = relationship(
+    customer: Mapped[Customer | None] = relationship(
         "Customer",
         back_populates="orders",
     )
 
-    staff_user: Mapped["User | None"] = relationship(
+    staff_user: Mapped[User | None] = relationship(
         "User",
         back_populates="orders",
         foreign_keys=[user_id],
     )
 
-    order_items: Mapped[list["OrderItem"]] = relationship(
+    order_items: Mapped[list[OrderItem]] = relationship(
         "OrderItem",
         back_populates="order",
     )
 
-    payments: Mapped[list["Payment"]] = relationship(
+    payments: Mapped[list[Payment]] = relationship(
         "Payment",
         back_populates="order",
     )
 
-    loyalty_transactions: Mapped[list["LoyaltyTransaction"]] = relationship(
+    loyalty_transactions: Mapped[list[LoyaltyTransaction]] = relationship(
         "LoyaltyTransaction",
         back_populates="order",
     )
@@ -302,22 +304,22 @@ class OrderItem(TimestampMixin, Base):
         nullable=True,
     )
 
-    order: Mapped["Order"] = relationship(
+    order: Mapped[Order] = relationship(
         "Order",
         back_populates="order_items",
     )
 
-    menu_item: Mapped["MenuItem"] = relationship(
+    menu_item: Mapped[MenuItem] = relationship(
         "MenuItem",
         back_populates="order_items",
     )
 
-    menu_item_size: Mapped["MenuItemSize | None"] = relationship(
+    menu_item_size: Mapped[MenuItemSize | None] = relationship(
         "MenuItemSize",
         back_populates="order_items",
     )
 
-    addons: Mapped[list["OrderItemAddon"]] = relationship(
+    addons: Mapped[list[OrderItemAddon]] = relationship(
         "OrderItemAddon",
         back_populates="order_item",
     )
@@ -377,12 +379,12 @@ class OrderItemAddon(Base):
         nullable=False,
     )
 
-    order_item: Mapped["OrderItem"] = relationship(
+    order_item: Mapped[OrderItem] = relationship(
         "OrderItem",
         back_populates="addons",
     )
 
-    menu_item_addon: Mapped["MenuItemAddon"] = relationship(
+    menu_item_addon: Mapped[MenuItemAddon] = relationship(
         "MenuItemAddon",
         back_populates="order_item_addons",
     )

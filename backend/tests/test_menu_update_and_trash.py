@@ -1,14 +1,15 @@
 import io
 import uuid
 from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.database.session import SessionLocal
-from app.modules.inventory.models import InventoryItem
-from app.modules.menu.models import MenuCategory, MenuItem
-from app.modules.users.models import Role, User, UserRole
 from app.core.security import hash_password
+from app.database.session import SessionLocal
+from app.main import app
+from app.modules.inventory.models import InventoryItem
+from app.modules.menu.models import MenuCategory
+from app.modules.users.models import Role, User, UserRole
 
 client = TestClient(app)
 
@@ -215,7 +216,7 @@ def test_rbac_security_trash_and_update_blocked_for_barista():
     assert trash_view.status_code == 403
 
     # Try updating product
-    bad_update = client.put(f"/api/v1/menu/items/1", json={
+    bad_update = client.put("/api/v1/menu/items/1", json={
         "category_id": cat_id,
         "item_name": "Rogue Update",
         "base_price": "1.00",
@@ -223,9 +224,9 @@ def test_rbac_security_trash_and_update_blocked_for_barista():
     assert bad_update.status_code == 403
 
     # Try moving to trash
-    bad_trash = client.patch(f"/api/v1/menu/items/1/trash", json={"is_deleted": True})
+    bad_trash = client.patch("/api/v1/menu/items/1/trash", json={"is_deleted": True})
     assert bad_trash.status_code == 403
 
     # Try permanently deleting
-    bad_delete = client.delete(f"/api/v1/menu/items/1/permanent")
+    bad_delete = client.delete("/api/v1/menu/items/1/permanent")
     assert bad_delete.status_code == 403

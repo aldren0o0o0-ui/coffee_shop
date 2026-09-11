@@ -52,7 +52,6 @@ export default function PosPage() {
   const [lookupQuery, setLookupQuery] = useState("");
   const [isSearchingLookup, setIsSearchingLookup] = useState(false);
   const [lookupResults, setLookupResults] = useState([]);
-  const [hasSearched, setHasSearched] = useState(false);
   const [selectedPendingOrder, setSelectedPendingOrder] = useState(null);
   const [pendingItems, setPendingItems] = useState([]);
   const [showAddDrinkDropdown, setShowAddDrinkDropdown] = useState(false);
@@ -168,11 +167,6 @@ export default function PosPage() {
   // Change Calculation for Register Cart
   const numericTendered = parseFloat(amountTendered) || 0;
   const registerChangeDue = numericTendered >= total ? numericTendered - total : 0;
-
-  function handleEditPendingOrderInRegister(order) {
-    if (!order) return;
-    handleSelectPendingOrder(order);
-  }
 
   // Submit POS Order
   async function handleCheckout(e) {
@@ -325,7 +319,6 @@ export default function PosPage() {
     try {
       const results = await lookupPendingCounterOrders(query);
       setLookupResults(results);
-      setHasSearched(true);
 
       const targetRef = autoSelectRef || query;
       if (targetRef) {

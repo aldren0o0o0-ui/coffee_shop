@@ -1,4 +1,5 @@
 from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -138,4 +139,3 @@ class MenuItemAvailabilityUpdateRequest(BaseModel):
     is_available: bool
 
 
-from app.modules.inventory.schemas import InventoryOption

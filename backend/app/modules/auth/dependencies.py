@@ -62,11 +62,13 @@ def get_current_authentication(
         raise unauthorized_exception()
 
     # Avoid writing to PostgreSQL on every request.
-    if (
-        auth_session.last_seen_at is None
-        or auth_session.last_seen_at
-        < now - timedelta(minutes=5)
-    ):
+    last_seen_at = auth_session.last_seen_at
+    # Some database drivers return timezone-naive datetimes even for
+    # timezone-aware columns. Treat those persisted UTC values as UTC.
+    if last_seen_at is not None and last_seen_at.tzinfo is None:
+        last_seen_at = last_seen_at.replace(tzinfo=timezone.utc)
+
+    if last_seen_at is None or last_seen_at < now - timedelta(minutes=5):
         auth_session.last_seen_at = now
         database.commit()
 

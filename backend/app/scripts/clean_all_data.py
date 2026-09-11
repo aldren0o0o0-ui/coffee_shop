@@ -1,24 +1,10 @@
 import sys
+
 from sqlalchemy import text
-from app.database.session import SessionLocal
 
 # Import all models to ensure mapper initialization
-import app.main
-from app.modules.users.models import User, Role, UserRole
-from app.modules.auth.models import AuthSession
-from app.modules.orders.models import Order, OrderItem, OrderItemAddon
-from app.modules.payments.models import Payment
-from app.modules.customers.models import Customer, LoyaltyTransaction
-from app.modules.inventory.models import InventoryItem, InventoryTransaction
-from app.modules.procurement.models import PurchaseRequest, PurchaseRequestItem
-from app.modules.menu.models import (
-    MenuCategory,
-    MenuItem,
-    MenuItemSize,
-    MenuItemAddon,
-    MenuItemIngredient,
-    MenuItemImage,
-)
+from app.database.session import SessionLocal
+from app.modules.users.models import User
 
 PROTECTED_USERNAMES = {"dren", "bron", "stephen", "michael", "draemon"}
 PROTECTED_EMAILS = {

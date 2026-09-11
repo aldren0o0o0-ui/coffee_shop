@@ -1,4 +1,5 @@
 from decimal import Decimal
+
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -14,7 +15,6 @@ from app.modules.menu.models import (
     MenuItemIngredient,
     MenuItemSize,
 )
-from app.modules.users.models import User
 from app.modules.menu.schemas import (
     MenuCategoryCatalog,
     MenuCategoryCreateRequest,
@@ -27,6 +27,7 @@ from app.modules.menu.schemas import (
     MenuItemSizeCatalog,
     MenuItemUpdateRequest,
 )
+from app.modules.users.models import User
 from app.shared.storage import delete_file_by_url, save_menu_item_image
 
 
@@ -183,7 +184,7 @@ def create_menu_item_draft(
         category_id=payload.category_id,
         item_name=clean_name,
         description=payload.description.strip() if payload.description else None,
-        base_price=payload.base_price if payload.base_price >= Decimal("0.00") else Decimal("0.00"),
+        base_price=max(payload.base_price, Decimal("0.00")),
         image_url=None,
         is_available=True,
         is_draft=True,

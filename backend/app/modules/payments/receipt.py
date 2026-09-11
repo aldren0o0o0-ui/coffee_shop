@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import mm
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    HRFlowable,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 if TYPE_CHECKING:
     from app.modules.orders.models import Order
@@ -21,9 +28,9 @@ os.makedirs(RECEIPTS_DIR, exist_ok=True)
 def generate_receipt_pdf(order: Order, payment: Payment | None = None) -> str:
     """
     Generates an immutable standard 80mm thermal receipt PDF using ReportLab.
-    Saves to /uploads/receipts/receipt_{order_id}.pdf and returns the relative URL.
+    Saves to an unguessable receipt path and returns the relative URL.
     """
-    filename = f"receipt_{order.order_id}.pdf"
+    filename = f"receipt_{uuid.uuid4().hex}.pdf"
     filepath = os.path.join(RECEIPTS_DIR, filename)
 
     # 80mm width standard thermal receipt, variable height

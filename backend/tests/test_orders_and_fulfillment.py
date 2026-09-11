@@ -1,16 +1,15 @@
-import os
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.core.security import hash_password
 from app.database.session import SessionLocal
 from app.main import app
-from app.modules.customers import service as customers_service
-from app.modules.customers.models import Customer
 from app.modules.inventory.models import InventoryItem
 from app.modules.menu.models import (
     MenuCategory,
@@ -19,26 +18,19 @@ from app.modules.menu.models import (
     MenuItemIngredient,
     MenuItemSize,
 )
+from app.modules.orders import service as orders_service
 from app.modules.orders.models import (
-    Order,
-    OrderChannel,
-    OrderItem,
-    OrderItemAddon,
     OrderStatus,
     OrderType,
 )
-from app.modules.orders import service as orders_service
 from app.modules.orders.schemas import (
     CustomerOrderCreateRequest,
     OrderItemAddonCreate,
     OrderItemCreate,
-    OrderStatusUpdateRequest,
-    OrderTrackingRequest,
     POSOrderCreateRequest,
 )
-from app.modules.payments.models import Payment, PaymentMethod, PaymentStatus
+from app.modules.payments.models import PaymentMethod
 from app.modules.users.models import Role, User, UserRole
-from app.core.security import hash_password
 
 client = TestClient(app)
 

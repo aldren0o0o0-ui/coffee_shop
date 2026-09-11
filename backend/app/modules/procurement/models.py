@@ -9,11 +9,13 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
-    Enum as SqlEnum,
     ForeignKey,
     Numeric,
     Text,
     func,
+)
+from sqlalchemy import (
+    Enum as SqlEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -107,13 +109,13 @@ class PurchaseRequest(TimestampMixin, Base):
         nullable=False,
     )
 
-    requester: Mapped["User"] = relationship(
+    requester: Mapped[User] = relationship(
         "User",
         back_populates="purchase_requests",
         foreign_keys=[requested_by],
     )
 
-    items: Mapped[list["PurchaseRequestItem"]] = relationship(
+    items: Mapped[list[PurchaseRequestItem]] = relationship(
         "PurchaseRequestItem",
         back_populates="purchase_request",
     )
@@ -175,12 +177,12 @@ class PurchaseRequestItem(TimestampMixin, Base):
         nullable=False,
     )
 
-    purchase_request: Mapped["PurchaseRequest"] = relationship(
+    purchase_request: Mapped[PurchaseRequest] = relationship(
         "PurchaseRequest",
         back_populates="items",
     )
 
-    inventory_item: Mapped["InventoryItem"] = relationship(
+    inventory_item: Mapped[InventoryItem] = relationship(
         "InventoryItem",
         back_populates="purchase_request_items",
     )

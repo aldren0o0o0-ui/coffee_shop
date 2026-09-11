@@ -2,15 +2,15 @@ import concurrent.futures
 import threading
 import uuid
 from decimal import Decimal
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.main import app
 from app.core.rate_limit import limiter
 from app.database.session import SessionLocal
+from app.main import app
 from app.modules.inventory.models import InventoryItem
 from app.modules.menu.models import MenuCategory, MenuItem, MenuItemIngredient
-from app.modules.orders.models import Order, OrderStatus
 from app.modules.payments.models import Payment, PaymentStatus
 
 client = TestClient(app)

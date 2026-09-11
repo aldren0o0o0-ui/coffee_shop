@@ -8,7 +8,6 @@ from app.core.security import hash_password
 from app.database.session import SessionLocal
 from app.modules.users.models import Role, User, UserRole
 
-
 OWNER_ROLE_NAME = "owner"
 MINIMUM_PASSWORD_LENGTH = 12
 

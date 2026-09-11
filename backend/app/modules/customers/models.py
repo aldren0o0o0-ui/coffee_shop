@@ -8,11 +8,13 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
-    Enum as SqlEnum,
     ForeignKey,
     Integer,
     String,
     func,
+)
+from sqlalchemy import (
+    Enum as SqlEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -101,12 +103,12 @@ class Customer(TimestampMixin, Base):
         nullable=True,
     )
 
-    orders: Mapped[list["Order"]] = relationship(
+    orders: Mapped[list[Order]] = relationship(
         "Order",
         back_populates="customer",
     )
 
-    loyalty_transactions: Mapped[list["LoyaltyTransaction"]] = relationship(
+    loyalty_transactions: Mapped[list[LoyaltyTransaction]] = relationship(
         "LoyaltyTransaction",
         back_populates="customer",
     )
@@ -190,12 +192,12 @@ class LoyaltyTransaction(Base):
         nullable=False,
     )
 
-    customer: Mapped["Customer"] = relationship(
+    customer: Mapped[Customer] = relationship(
         "Customer",
         back_populates="loyalty_transactions",
     )
 
-    order: Mapped["Order | None"] = relationship(
+    order: Mapped[Order | None] = relationship(
         "Order",
         back_populates="loyalty_transactions",
     )

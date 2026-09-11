@@ -47,6 +47,11 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def as_utc(value: datetime) -> datetime:
+    """Normalize database timestamps returned without timezone information."""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
 def expire_stale_orders(database: Session) -> int:
     """
     Finds and marks all awaiting_payment orders that have passed expires_at as EXPIRED.
@@ -387,7 +392,11 @@ def get_order_for_tracking(
         )
 
     # Lazy check for expiry if still unpaid
-    if order.order_status == OrderStatus.AWAITING_PAYMENT and order.expires_at and order.expires_at < utc_now():
+    if (
+        order.order_status == OrderStatus.AWAITING_PAYMENT
+        and order.expires_at
+        and as_utc(order.expires_at) < utc_now()
+    ):
         order.order_status = OrderStatus.EXPIRED
         database.commit()
 

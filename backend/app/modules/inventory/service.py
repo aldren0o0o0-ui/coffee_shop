@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -112,7 +113,7 @@ def deduct_inventory_for_order(
         order_qty = item_qty_map.get(ing.menu_item_id, 0)
         qty_needed = ing.quantity_required * Decimal(order_qty)
         required_ingredients[ing.inventory_item_id] = (
-            required_ingredients.get(ing.inventory_item_id, Decimal("0")) + qty_needed
+            required_ingredients.get(ing.inventory_item_id, Decimal(0)) + qty_needed
         )
 
     if not required_ingredients:
@@ -207,7 +208,7 @@ def receive_stock(
     """
     Receives inventory stock, increments quantity_on_hand, and records a PURCHASE_IN transaction.
     """
-    if quantity <= Decimal("0"):
+    if quantity <= Decimal(0):
         raise ValueError("Received stock quantity must be greater than zero.")
 
     return record_inventory_transaction(
@@ -242,7 +243,7 @@ def create_inventory_item(
     database.add(item)
     database.flush()
 
-    if payload.quantity_on_hand > Decimal("0"):
+    if payload.quantity_on_hand > Decimal(0):
         tx = InventoryTransaction(
             inventory_item_id=item.inventory_item_id,
             transaction_type=InventoryTransactionType.ADJUSTMENT,
@@ -299,7 +300,7 @@ def adjust_inventory_stock(
     """
     Manually adjusts stock (restock, adjustment, waste, spoilage).
     """
-    if quantity_change == Decimal("0"):
+    if quantity_change == Decimal(0):
         raise ValueError("Adjustment quantity cannot be zero.")
 
     item = database.get(InventoryItem, item_id)
@@ -307,7 +308,7 @@ def adjust_inventory_stock(
         raise ValueError(f"InventoryItem with ID {item_id} not found")
 
     new_quantity = item.quantity_on_hand + quantity_change
-    if new_quantity < Decimal("0"):
+    if new_quantity < Decimal(0):
         raise ValueError(f"Adjustment would result in negative stock ({new_quantity} {item.unit_of_measure}). Current: {item.quantity_on_hand}")
 
     item.quantity_on_hand = new_quantity

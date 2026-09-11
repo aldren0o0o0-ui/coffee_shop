@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Annotated
-
 from fastapi import APIRouter, HTTPException, status
 
 from app.modules.auth.dependencies import CurrentAuthenticationDependency

@@ -1,11 +1,21 @@
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.core.rate_limit import limiter
+from app.core.security import hash_password
 from app.database.session import SessionLocal
+from app.main import app
+from app.modules.analytics.service import (
+    get_barista_queue,
+    get_cashier_dashboard_stats,
+    get_inventory_dashboard_stats,
+    get_manager_dashboard_stats,
+    get_owner_dashboard_stats,
+)
 from app.modules.customers.models import Customer
 from app.modules.inventory.models import (
     InventoryItem,
@@ -15,31 +25,22 @@ from app.modules.inventory.models import (
 from app.modules.menu.models import (
     MenuCategory,
     MenuItem,
-    MenuItemSize,
     MenuItemAddon,
+    MenuItemSize,
 )
 from app.modules.orders.models import (
     Order,
+    OrderChannel,
     OrderItem,
     OrderItemAddon,
     OrderStatus,
     OrderType,
-    OrderChannel,
 )
 from app.modules.procurement.models import (
     PurchaseRequest,
     PurchaseRequestStatus,
 )
 from app.modules.users.models import Role, User, UserRole
-from app.core.rate_limit import limiter
-from app.core.security import hash_password
-from app.modules.analytics.service import (
-    get_owner_dashboard_stats,
-    get_manager_dashboard_stats,
-    get_cashier_dashboard_stats,
-    get_barista_queue,
-    get_inventory_dashboard_stats,
-)
 
 client = TestClient(app)
 

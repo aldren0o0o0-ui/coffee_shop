@@ -2,22 +2,22 @@ from __future__ import annotations
 
 import logging
 import random
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Sequence
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.rate_limit import check_payment_attempt_rate_limit
-from app.modules.orders.models import Order, OrderItem, OrderItemAddon, OrderStatus
 from app.modules.customers import service as customers_service
 from app.modules.inventory.service import (
     InsufficientStockError,
     deduct_inventory_for_order,
 )
 from app.modules.menu.models import MenuItem, MenuItemIngredient
+from app.modules.orders.models import Order, OrderItem, OrderItemAddon, OrderStatus
 from app.modules.payments.models import Payment, PaymentMethod, PaymentStatus
 from app.modules.payments.receipt import generate_receipt_pdf
 from app.modules.payments.schemas import CustomerPaymentRequest, PayAtCounterRequest
@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def as_utc(value: datetime) -> datetime:
+    """Normalize database timestamps returned without timezone information."""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 def generate_unique_pickup_code(database: Session) -> str:
@@ -123,6 +128,12 @@ def process_customer_payment(
             detail="Too many payment attempts. Please wait a few minutes before retrying.",
         )
 
+    # SQLite ignores SELECT ... FOR UPDATE. Begin an immediate transaction so
+    # local/test deployments retain the same settlement serialization that
+    # PostgreSQL provides through row locks in production.
+    if database.bind and database.bind.dialect.name == "sqlite":
+        database.execute(text("BEGIN IMMEDIATE"))
+
     # 2. Query Order with items and customer (using FOR UPDATE to serialize payment attempts)
     statement = (
         select(Order)
@@ -169,7 +180,7 @@ def process_customer_payment(
 
     # 4. Check Expiry
     now = utc_now()
-    if (order.expires_at and order.expires_at < now) or order.order_status == OrderStatus.EXPIRED:
+    if (order.expires_at and as_utc(order.expires_at) < now) or order.order_status == OrderStatus.EXPIRED:
         order.order_status = OrderStatus.EXPIRED
         database.commit()
         raise HTTPException(
@@ -289,7 +300,7 @@ def process_pay_at_counter(
             detail=f"Order is already in '{order.order_status.value}' status.",
         )
 
-    if order.expires_at and order.expires_at < now:
+    if order.expires_at and as_utc(order.expires_at) < now:
         order.order_status = OrderStatus.EXPIRED
         if order.customer:
             customers_service.record_customer_no_show(database, order.customer)

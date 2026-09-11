@@ -4,15 +4,16 @@ Populates professional categories, inventory raw ingredients, handcrafted drinks
 sizing, add-on options, and recipe associations.
 """
 from decimal import Decimal
+
 from app.database.session import SessionLocal
+from app.modules.inventory.models import InventoryItem
 from app.modules.menu.models import (
     MenuCategory,
     MenuItem,
-    MenuItemSize,
     MenuItemAddon,
     MenuItemIngredient,
+    MenuItemSize,
 )
-from app.modules.inventory.models import InventoryItem
 
 
 def seed_specialty_coffee_catalog():
@@ -528,5 +529,4 @@ def seed_specialty_coffee_catalog():
 
 
 if __name__ == "__main__":
-    import app.main  # Ensures all ORM mappers and relationships are initialized
     seed_specialty_coffee_catalog()

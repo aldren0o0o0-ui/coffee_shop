@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.modules.orders.models import OrderChannel, OrderStatus, OrderType

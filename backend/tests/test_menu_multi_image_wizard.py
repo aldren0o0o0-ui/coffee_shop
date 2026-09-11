@@ -1,15 +1,15 @@
 import io
 import uuid
 from decimal import Decimal
-from fastapi.testclient import TestClient
-from sqlalchemy import select
 
-from app.main import app
-from app.database.session import SessionLocal
-from app.modules.inventory.models import InventoryItem
-from app.modules.menu.models import MenuCategory, MenuItem, MenuItemImage
-from app.modules.users.models import Role, User, UserRole
+from fastapi.testclient import TestClient
+
 from app.core.security import hash_password
+from app.database.session import SessionLocal
+from app.main import app
+from app.modules.inventory.models import InventoryItem
+from app.modules.menu.models import MenuCategory
+from app.modules.users.models import Role, User, UserRole
 
 client = TestClient(app)
 

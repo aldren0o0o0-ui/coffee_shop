@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { fetchMenuCatalog } from "../../menu/api/menuApi";
 import { getImageUrl } from "../../menu/utils/image";
-import { payCustomerOrder } from "../../payments/api/paymentsApi";
 import { submitCustomerOrder } from "../api/ordersApi";
-import { downloadReceipt, printReceipt } from "../utils/receiptUtils";
+import { downloadReceipt } from "../utils/receiptUtils";
 
 export default function CustomerOrderPage() {
   const location = useLocation();

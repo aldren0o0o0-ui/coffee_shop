@@ -1,7 +1,7 @@
 from sqlalchemy import text
-from app.database.session import engine
+
 from app.database.base import Base
-import app.database.models
+from app.database.session import engine
 
 
 def migrate():

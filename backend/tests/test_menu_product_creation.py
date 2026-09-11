@@ -1,13 +1,13 @@
 import uuid
 from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.database.session import SessionLocal
-from app.modules.inventory.models import InventoryItem
-from app.modules.menu.models import MenuCategory, MenuItem
-from app.modules.users.models import Role, User, UserRole
 from app.core.security import hash_password
+from app.database.session import SessionLocal
+from app.main import app
+from app.modules.inventory.models import InventoryItem
+from app.modules.users.models import Role, User, UserRole
 
 client = TestClient(app)
 

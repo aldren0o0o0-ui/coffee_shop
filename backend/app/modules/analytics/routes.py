@@ -1,11 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query, status
-from app.modules.auth.dependencies import CurrentAuthenticationDependency
-from app.shared.dependencies import DatabaseDependency
+
 from app.modules.analytics.schemas import (
     BaristaDashboardStats,
     CombinedDashboardResponse,
     InventoryStaffDashboardStats,
-    OwnerDashboardStats,
     StoreReportResponse,
 )
 from app.modules.analytics.service import (
@@ -13,8 +11,9 @@ from app.modules.analytics.service import (
     get_barista_queue,
     get_combined_dashboard_overview,
     get_inventory_dashboard_stats,
-    get_owner_dashboard_stats,
 )
+from app.modules.auth.dependencies import CurrentAuthenticationDependency
+from app.shared.dependencies import DatabaseDependency
 
 router = APIRouter(
     prefix="/dashboard",

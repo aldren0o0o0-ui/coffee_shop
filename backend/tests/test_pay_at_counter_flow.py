@@ -1,20 +1,24 @@
 import os
-from decimal import Decimal
 from datetime import timedelta
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.database.session import SessionLocal
 from app.main import app
-from app.modules.customers.models import Customer
 from app.modules.inventory.models import InventoryItem
-from app.modules.menu.models import MenuCategory, MenuItem, MenuItemIngredient, MenuItemSize
+from app.modules.menu.models import (
+    MenuCategory,
+    MenuItem,
+    MenuItemIngredient,
+    MenuItemSize,
+)
 from app.modules.orders.models import Order, OrderStatus
-from app.modules.payments.models import Payment, PaymentMethod
-from app.modules.users.models import Role, User, UserRole
-from app.core.security import hash_password
 from app.modules.orders.service import utc_now
+from app.modules.users.models import Role, User, UserRole
 
 
 @pytest.fixture

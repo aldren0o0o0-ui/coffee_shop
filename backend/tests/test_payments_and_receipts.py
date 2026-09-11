@@ -1,13 +1,19 @@
 import os
+import re
 import uuid
 from decimal import Decimal
+
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.core.security import hash_password
 from app.database.session import SessionLocal
 from app.main import app
+from app.modules.customers import service as customers_service
+from app.modules.inventory.models import InventoryItem
+from app.modules.menu.models import MenuCategory, MenuItem, MenuItemIngredient
 from app.modules.orders.models import (
     Order,
     OrderChannel,
@@ -15,15 +21,10 @@ from app.modules.orders.models import (
     OrderStatus,
     OrderType,
 )
-from app.modules.customers import service as customers_service
-from app.modules.inventory.models import InventoryItem
-from app.modules.menu.models import MenuCategory, MenuItem, MenuItemIngredient
-from app.modules.payments.models import Payment, PaymentMethod, PaymentStatus
-from app.modules.payments.receipt import generate_receipt_pdf
 from app.modules.payments import service as payments_service
+from app.modules.payments.models import Payment, PaymentMethod, PaymentStatus
 from app.modules.payments.schemas import CustomerPaymentRequest, PayAtCounterRequest
 from app.modules.users.models import Role, User, UserRole
-from app.core.security import hash_password
 
 client = TestClient(app)
 
@@ -200,6 +201,13 @@ def test_successful_online_payment_and_receipt_generation(db_session):
     with open(abs_pdf_path, "rb") as f:
         header = f.read(5)
         assert header == b"%PDF-", "File must start with standard PDF header"
+
+    # Receipts remain retrievable by their opaque URL, but sequential order IDs
+    # are no longer exposed as filenames.
+    assert re.fullmatch(r"/uploads/receipts/receipt_[0-9a-f]{32}\.pdf", payment.receipt_pdf_url)
+    response = client.get(payment.receipt_pdf_url)
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF-")
 
 
 def test_failed_payment_on_insufficient_inventory_and_no_receipt(db_session):

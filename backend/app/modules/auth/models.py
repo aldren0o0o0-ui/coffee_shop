@@ -84,7 +84,7 @@ class AuthSession(Base):
         nullable=True,
     )
 
-    user: Mapped["User"] = relationship(
+    user: Mapped[User] = relationship(
         "User",
         back_populates="auth_sessions",
     )

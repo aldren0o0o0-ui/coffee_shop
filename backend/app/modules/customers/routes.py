@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.modules.auth.dependencies import (
     CurrentAuthenticationDependency,
@@ -11,8 +10,6 @@ from app.modules.auth.dependencies import (
 from app.modules.customers import service
 from app.modules.customers.schemas import (
     CustomerBlockRequest,
-    CustomerLookupResponse,
-    CustomerProfileResponse,
     CustomerResponse,
     CustomerUpdateRequest,
     LoyaltyAdjustmentRequest,
