@@ -72,7 +72,7 @@ def login(
         max_age=settings.session_lifetime_hours * 60 * 60,
         httponly=True,
         secure=settings.session_cookie_secure,
-        samesite="lax",
+        samesite=settings.effective_cookie_samesite,
         path="/api/v1",
     )
 
@@ -97,7 +97,7 @@ def logout(
         key=settings.session_cookie_name,
         httponly=True,
         secure=settings.session_cookie_secure,
-        samesite="lax",
+        samesite=settings.effective_cookie_samesite,
         path="/api/v1",
     )
 

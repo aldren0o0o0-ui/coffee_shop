@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     session_lifetime_hours: int = Field(default=8, ge=1, le=168)
     # Set SESSION_COOKIE_SECURE=true in production environment variables over HTTPS (SEC-6)
     session_cookie_secure: bool = False
+    session_cookie_samesite: str = "lax"
+
+    @property
+    def effective_cookie_samesite(self) -> str:
+        # Cross-origin authentication (e.g. Vercel frontend calling Render backend)
+        # requires SameSite=None when Secure=True over HTTPS.
+        if self.session_cookie_secure:
+            return "none"
+        return self.session_cookie_samesite
 
     # SMTP / Email Notification Settings
     smtp_host: str = ""
@@ -58,7 +67,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        raw_origins = [o.strip() for o in self.frontend_url.split(",") if o.strip()]
+        raw_origins = [o.strip().rstrip("/") for o in self.frontend_url.split(",") if o.strip()]
         dev_origins = [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
