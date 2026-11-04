@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BranchContext } from "./branchContext";
+import apiClient from "../../../api/client";
 
 export function BranchProvider({ children }) {
   const [branches, setBranches] = useState([]);
@@ -10,11 +11,8 @@ export function BranchProvider({ children }) {
 
   async function loadBranches() {
     try {
-      const res = await fetch("/api/v1/branches");
-      if (res.ok) {
-        const data = await res.json();
-        setBranches(data);
-      }
+      const res = await apiClient.get("/branches");
+      setBranches(res.data || []);
     } catch (err) {
       console.warn("Failed to load branches:", err);
     } finally {

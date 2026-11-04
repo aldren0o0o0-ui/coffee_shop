@@ -134,3 +134,43 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #c8860a;
 }
+
+/* Thermal receipt print stylesheet */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide everything on page by default */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Only show the thermal receipt container */
+  #pos-thermal-receipt-container,
+  #pos-thermal-receipt-container * {
+    visibility: visible !important;
+  }
+
+  #pos-thermal-receipt-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 3mm 4mm !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

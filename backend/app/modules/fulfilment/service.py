@@ -9,19 +9,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.modules.customers.models import Customer
-from app.modules.inventory.models import InventoryItem
-from app.modules.menu.models import (
-    MenuItem,
-    MenuItemAddon,
-    MenuItemIngredient,
-    MenuItemSize,
-)
-from app.modules.orders.models import (
-    Order,
-    OrderItem,
-    OrderItemAddon,
-    OrderStatus,
-)
 from app.modules.fulfilment.schemas import (
     FulfilmentQueueResponse,
     FulfilmentQueueTicket,
@@ -30,6 +17,17 @@ from app.modules.fulfilment.schemas import (
     PickupBoardTicket,
     ReorderItemSummary,
     ReorderResponse,
+)
+from app.modules.menu.models import (
+    MenuItem,
+    MenuItemIngredient,
+    MenuItemSize,
+)
+from app.modules.orders.models import (
+    Order,
+    OrderItem,
+    OrderItemAddon,
+    OrderStatus,
 )
 
 logger = logging.getLogger(__name__)

@@ -11,9 +11,9 @@ from app.modules.inventory.models import (
     InventoryTransactionType,
 )
 from app.modules.inventory.schemas import (
-    InventoryItemCreate,
     InventoryForecastItem,
     InventoryForecastResponse,
+    InventoryItemCreate,
     InventoryItemUpdate,
     InventoryOption,
 )

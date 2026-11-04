@@ -1,9 +1,12 @@
 from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
 from app.modules.customers.models import Customer
 from app.modules.engagement.schemas import WinBackAudienceResponse
 from app.modules.orders.models import Order, OrderStatus
+
 
 def get_win_back_audience(database: Session, inactive_days: int) -> WinBackAudienceResponse:
     cutoff = datetime.now(timezone.utc) - timedelta(days=inactive_days)

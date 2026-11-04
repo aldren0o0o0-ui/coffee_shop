@@ -1,4 +1,5 @@
 import './App.css'
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { useAuth } from './modules/auth/context/useAuth';
@@ -7,25 +8,28 @@ import AuthForm from './modules/auth/components/AuthForm';
 import ProtectedRoute from './modules/auth/components/ProtectedRoute';
 import RoleRoute from './modules/auth/components/RoleRoute';
 import AppLayout from './layouts/AppLayout';
-import Dashboard from './modules/analytics/pages/DashboardPage';
-import Team from './modules/users/pages/TeamPage';
-import Menu from './modules/menu/pages/MenuManagementPage';
-import CustomerOrderPage from './modules/orders/pages/CustomerOrderPage';
-import CustomerTrackingPage from './modules/orders/pages/CustomerTrackingPage';
-import CustomerBrowsePage from './modules/menu/pages/CustomerBrowsePage';
-import LandingPage from './pages/LandingPage';
 
-import PosPage from './modules/orders/pages/PosPage';
-import OrdersPage from './modules/orders/pages/OrdersPage';
-import DrinkPreparationPage from './modules/orders/pages/DrinkPreparationPage';
-import PickupBoardPage from './modules/orders/pages/PickupBoardPage';
-import InventoryPage from './modules/inventory/pages/InventoryPage';
-import PurchasingPage from './modules/procurement/pages/PurchasingPage';
-import ReportsPage from './modules/analytics/pages/ReportsPage';
-import SettingsPage from './pages/SettingsPage';
-import CostingPage from './modules/costing/pages/CostingPage';
-import ShiftPage from './modules/shifts/pages/ShiftPage';
-import CustomerProfilePage from './modules/customers/pages/CustomerProfilePage';
+// Public customer pages (lazy loaded)
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const CustomerBrowsePage = lazy(() => import('./modules/menu/pages/CustomerBrowsePage'));
+const CustomerOrderPage = lazy(() => import('./modules/orders/pages/CustomerOrderPage'));
+const CustomerTrackingPage = lazy(() => import('./modules/orders/pages/CustomerTrackingPage'));
+const PickupBoardPage = lazy(() => import('./modules/orders/pages/PickupBoardPage'));
+
+// Staff workstation pages (lazy loaded)
+const Dashboard = lazy(() => import('./modules/analytics/pages/DashboardPage'));
+const PosPage = lazy(() => import('./modules/orders/pages/PosPage'));
+const ShiftPage = lazy(() => import('./modules/shifts/pages/ShiftPage'));
+const OrdersPage = lazy(() => import('./modules/orders/pages/OrdersPage'));
+const DrinkPreparationPage = lazy(() => import('./modules/orders/pages/DrinkPreparationPage'));
+const Menu = lazy(() => import('./modules/menu/pages/MenuManagementPage'));
+const InventoryPage = lazy(() => import('./modules/inventory/pages/InventoryPage'));
+const PurchasingPage = lazy(() => import('./modules/procurement/pages/PurchasingPage'));
+const ReportsPage = lazy(() => import('./modules/analytics/pages/ReportsPage'));
+const CostingPage = lazy(() => import('./modules/costing/pages/CostingPage'));
+const CustomerProfilePage = lazy(() => import('./modules/customers/pages/CustomerProfilePage'));
+const Team = lazy(() => import('./modules/users/pages/TeamPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 function LoginRoute() {
   const { 
@@ -52,79 +56,90 @@ function LoginRoute() {
 function App() {
   return (
     <BranchProvider>
-      <Routes>
-        {/* Public Landing Page for Viewers */}
-        <Route element={<LandingPage />} path="/" />
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center bg-stone-100">
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-2xl animate-spin">☕</span>
+              <p className="text-xs font-semibold text-stone-500">Loading workstation...</p>
+            </div>
+          </div>
+        }
+      >
+        <Routes>
+          {/* Public Landing Page for Viewers */}
+          <Route element={<LandingPage />} path="/" />
 
-      {/* Public Customer Browsing, Ordering & Tracking */}
-      <Route element={<CustomerBrowsePage />} path="/browse" />
-      <Route element={<CustomerOrderPage />} path="/order" />
-      <Route element={<CustomerTrackingPage />} path="/track" />
-      <Route element={<PickupBoardPage />} path="/pickup" />
+        {/* Public Customer Browsing, Ordering & Tracking */}
+        <Route element={<CustomerBrowsePage />} path="/browse" />
+        <Route element={<CustomerOrderPage />} path="/order" />
+        <Route element={<CustomerTrackingPage />} path="/track" />
+        <Route element={<PickupBoardPage />} path="/pickup" />
 
-      {/* Staff Authentication */}
-      <Route element={<LoginRoute />} path="/login" />
-      
-      {/* Staff Workspace Routes */}
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route element={<Dashboard />} path="overview" />
-          <Route element={<Dashboard />} path="dashboard" />
+        {/* Staff Authentication */}
+        <Route element={<LoginRoute />} path="/login" />
+        
+        {/* Staff Workspace Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route element={<Dashboard />} path="overview" />
+            <Route element={<Dashboard />} path="dashboard" />
 
-          {/* POS: Owner, Manager, Cashier */}
-          <Route element={<RoleRoute allowedRoles={["owner", "manager", "cashier"]} />}>
-            <Route element={<PosPage />} path="pos" />
-            <Route element={<ShiftPage />} path="shift" />
-            <Route element={<CustomerProfilePage />} path="customers" />
-            <Route element={<Navigate to="/pos?mode=lookup" replace />} path="staff/pos" />
-          </Route>
+            {/* POS: Owner, Manager, Cashier */}
+            <Route element={<RoleRoute allowedRoles={["owner", "manager", "cashier"]} />}>
+              <Route element={<PosPage />} path="pos" />
+              <Route element={<ShiftPage />} path="shift" />
+              <Route element={<CustomerProfilePage />} path="customers" />
+              <Route element={<Navigate to="/pos?mode=lookup" replace />} path="staff/pos" />
+            </Route>
 
-          {/* Orders: Owner, Manager, Cashier, Barista */}
-          <Route element={<RoleRoute allowedRoles={["owner", "manager", "cashier", "barista"]} />}>
-            <Route element={<OrdersPage />} path="orders" />
-          </Route>
+            {/* Orders: Owner, Manager, Cashier, Barista */}
+            <Route element={<RoleRoute allowedRoles={["owner", "manager", "cashier", "barista"]} />}>
+              <Route element={<OrdersPage />} path="orders" />
+            </Route>
 
-          {/* Drink Preparation: Owner, Manager, Barista */}
-          <Route element={<RoleRoute allowedRoles={["owner", "manager", "barista"]} />}>
-            <Route element={<DrinkPreparationPage />} path="preparation" />
-          </Route>
+            {/* Drink Preparation: Owner, Manager, Barista */}
+            <Route element={<RoleRoute allowedRoles={["owner", "manager", "barista"]} />}>
+              <Route element={<DrinkPreparationPage />} path="preparation" />
+            </Route>
 
-          {/* Menu Catalog: Owner, Manager */}
-          <Route element={<RoleRoute allowedRoles={["owner", "manager"]} />}>
-            <Route element={<Menu />} path="menu" />
-          </Route>
+            {/* Menu Catalog: Owner, Manager */}
+            <Route element={<RoleRoute allowedRoles={["owner", "manager"]} />}>
+              <Route element={<Menu />} path="menu" />
+            </Route>
 
-          {/* Stock / Inventory: Owner, Manager, Inventory Staff */}
-          <Route element={<RoleRoute allowedRoles={["owner", "manager", "inventory staff", "inventory_staff"]} />}>
-            <Route element={<InventoryPage />} path="inventory" />
-          </Route>
+            {/* Stock / Inventory: Owner, Manager, Inventory Staff */}
+            <Route element={<RoleRoute allowedRoles={["owner", "manager", "inventory staff", "inventory_staff"]} />}>
+              <Route element={<InventoryPage />} path="inventory" />
+            </Route>
 
-          {/* Purchasing & Procurement: Owner, Manager, Inventory Staff */}
-          <Route element={<RoleRoute allowedRoles={["owner", "manager", "inventory staff", "inventory_staff"]} />}>
-            <Route element={<PurchasingPage />} path="purchasing" />
-          </Route>
+            {/* Purchasing & Procurement: Owner, Manager, Inventory Staff */}
+            <Route element={<RoleRoute allowedRoles={["owner", "manager", "inventory staff", "inventory_staff"]} />}>
+              <Route element={<PurchasingPage />} path="purchasing" />
+            </Route>
 
-          {/* Reports & Analytics: Owner, Manager */}
-          <Route element={<RoleRoute allowedRoles={["owner", "manager"]} />}>
-            <Route element={<ReportsPage />} path="reports" />
-            <Route element={<CostingPage />} path="costing" />
-          </Route>
+            {/* Reports & Analytics: Owner, Manager */}
+            <Route element={<RoleRoute allowedRoles={["owner", "manager"]} />}>
+              <Route element={<ReportsPage />} path="reports" />
+              <Route element={<CostingPage />} path="costing" />
+            </Route>
 
-          {/* Team Accounts: Owner only */}
-          <Route element={<RoleRoute allowedRoles={["owner"]} />}>
-            <Route element={<Team />} path="team" />
-          </Route>
+            {/* Team Accounts: Owner only */}
+            <Route element={<RoleRoute allowedRoles={["owner"]} />}>
+              <Route element={<Team />} path="team" />
+            </Route>
 
-          {/* Store Settings: Owner only */}
-          <Route element={<RoleRoute allowedRoles={["owner"]} />}>
-            <Route element={<SettingsPage />} path="settings" />
+            {/* Store Settings: Owner only */}
+            <Route element={<RoleRoute allowedRoles={["owner"]} />}>
+              <Route element={<SettingsPage />} path="settings" />
+            </Route>
           </Route>
         </Route>
-      </Route>
 
-        {/* Catch-all fallback */}
-        <Route element={<Navigate replace to="/" />} path="*" />
-      </Routes>
+          {/* Catch-all fallback */}
+          <Route element={<Navigate replace to="/" />} path="*" />
+        </Routes>
+      </Suspense>
     </BranchProvider>
   );
 }

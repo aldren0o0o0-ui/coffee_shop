@@ -1,8 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
+
 from pydantic import BaseModel, Field
-from app.modules.shifts.models import ShiftStatus, VarianceReviewStatus
-from app.modules.shifts.models import CashMovementType
+
+from app.modules.shifts.models import (
+    CashMovementType,
+    ShiftStatus,
+    VarianceReviewStatus,
+)
+
 
 class OpenShiftRequest(BaseModel):
     opening_cash: Decimal = Field(ge=0)

@@ -5,11 +5,10 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.modules.inventory.models import InventoryItem
-from app.modules.menu.models import MenuItem, MenuItemIngredient
 from app.modules.notifications.models import AlertPreference, SystemAlert
 from app.modules.notifications.schemas import AlertPreferenceUpdate
 from app.modules.orders.models import Order, OrderStatus

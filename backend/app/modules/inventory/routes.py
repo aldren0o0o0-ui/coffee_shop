@@ -2,20 +2,20 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.modules.auth.dependencies import CurrentAuthenticationDependency
 from app.modules.inventory.schemas import (
+    ForecastPurchaseRequest,
     InventoryAdjustmentRequest,
+    InventoryForecastResponse,
     InventoryItemCreate,
     InventoryItemResponse,
     InventoryItemUpdate,
     InventoryOption,
-    InventoryForecastResponse,
-    ForecastPurchaseRequest,
     InventoryTransactionDetailResponse,
 )
 from app.modules.inventory.service import (
     adjust_inventory_stock,
     create_inventory_item,
-    get_inventory_options,
     get_inventory_forecast,
+    get_inventory_options,
     list_inventory_items,
     list_inventory_transactions,
     update_inventory_item,
@@ -69,7 +69,10 @@ def fetch_inventory_forecast_route(authentication: CurrentAuthenticationDependen
 def create_forecast_purchase_request(payload: ForecastPurchaseRequest, authentication: CurrentAuthenticationDependency, database: DatabaseDependency):
     """Convert current forecast recommendations into an editable procurement draft."""
     verify_inventory_access(authentication.user)
-    from app.modules.procurement.schemas import PurchaseRequestCreate, PurchaseRequestItemCreate
+    from app.modules.procurement.schemas import (
+        PurchaseRequestCreate,
+        PurchaseRequestItemCreate,
+    )
     from app.modules.procurement.service import create_purchase_request
     forecast = get_inventory_forecast(database, payload.days)
     items = [PurchaseRequestItemCreate(inventory_item_id=item.inventory_item_id, quantity_requested=item.suggested_purchase_quantity) for item in forecast.items if item.suggested_purchase_quantity > 0]

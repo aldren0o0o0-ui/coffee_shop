@@ -17,7 +17,13 @@ from app.modules.inventory.service import (
     deduct_inventory_for_order,
 )
 from app.modules.menu.models import MenuItem, MenuItemIngredient
-from app.modules.orders.models import Order, OrderEvent, OrderItem, OrderItemAddon, OrderStatus
+from app.modules.orders.models import (
+    Order,
+    OrderEvent,
+    OrderItem,
+    OrderItemAddon,
+    OrderStatus,
+)
 from app.modules.payments.models import Payment, PaymentMethod, PaymentStatus
 from app.modules.payments.receipt import generate_receipt_pdf
 from app.modules.payments.schemas import CustomerPaymentRequest, PayAtCounterRequest

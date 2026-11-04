@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.modules.auth.dependencies import CurrentAuthenticationDependency

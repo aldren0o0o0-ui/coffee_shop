@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from decimal import Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -38,7 +37,7 @@ def ensure_default_branch(database: Session) -> Branch:
     if not branch:
         branch = Branch(
             branch_id=1,
-            name="Main Roastery",
+            name="Main Branch",
             code="MAIN",
             address="123 Artisan Coffee St., Manila",
             timezone="Asia/Manila",
@@ -46,6 +45,11 @@ def ensure_default_branch(database: Session) -> Branch:
             operational_settings='{"opening_time": "07:00", "closing_time": "22:00"}',
         )
         database.add(branch)
+        database.flush()
+        database.commit()
+        database.refresh(branch)
+    elif not branch.name or len(branch.name) < 2:
+        branch.name = "Main Branch"
         database.flush()
         database.commit()
         database.refresh(branch)

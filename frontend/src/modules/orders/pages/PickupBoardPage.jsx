@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import apiClient from "../../../api/client";
 
 export default function PickupBoardPage() {
   const [boardData, setBoardData] = useState({ preparing: [], ready: [], last_updated: null });
@@ -8,10 +9,8 @@ export default function PickupBoardPage() {
 
   async function loadBoard() {
     try {
-      const res = await fetch("/api/v1/customer/pickup-board");
-      if (!res.ok) throw new Error("Failed to load pickup board");
-      const data = await res.json();
-      setBoardData(data);
+      const res = await apiClient.get("/customer/pickup-board");
+      setBoardData(res.data);
       setError("");
     } catch (err) {
       console.error(err);

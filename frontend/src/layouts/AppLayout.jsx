@@ -108,20 +108,18 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Multi-Branch Selector */}
-            <BranchSelector />
 
             {/* View Public Storefront Link */}
-            <Link
+            {/* <Link
               to="/"
               className="hidden items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-xs font-semibold text-stone-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-950 sm:flex"
               title="View Public Storefront"
             >
               <span>Storefront</span>
               <span>↗</span>
-            </Link>
+            </Link> */}
 
-            <button
+            {/* <button
               aria-label="Change Password"
               className="hidden items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-xs font-semibold text-stone-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-950 sm:flex"
               onClick={openPasswordModal}
@@ -131,7 +129,7 @@ export default function AppLayout() {
                 <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span>Password</span>
-            </button>
+            </button> */}
 
             <button
               className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -144,8 +142,8 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="p-4 sm:p-8">
-          <div className="mx-auto max-w-7xl">
+        <main className={location.pathname === "/pos" ? "p-2 sm:p-4 lg:p-6" : "p-4 sm:p-8"}>
+          <div className={location.pathname === "/pos" ? "mx-auto max-w-[1700px]" : "mx-auto max-w-7xl"}>
             <Outlet />
           </div>
         </main>

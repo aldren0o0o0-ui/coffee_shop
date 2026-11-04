@@ -46,7 +46,7 @@ def upgrade():
         [
             {
                 "branch_id": 1,
-                "name": "Main Roastery",
+                "name": "",
                 "code": "MAIN",
                 "address": "123 Artisan Coffee St., Manila",
                 "timezone": "Asia/Manila",

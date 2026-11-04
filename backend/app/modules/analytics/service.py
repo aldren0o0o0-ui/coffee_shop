@@ -31,6 +31,8 @@ from app.modules.menu.models import (
     MenuItem,
     MenuItemIngredient,
 )
+from app.modules.notifications.models import SystemAlert
+from app.modules.notifications.service import evaluate_system_alerts
 from app.modules.orders.models import (
     Order,
     OrderItem,
@@ -42,8 +44,6 @@ from app.modules.procurement.models import (
     PurchaseRequest,
     PurchaseRequestStatus,
 )
-from app.modules.notifications.models import SystemAlert
-from app.modules.notifications.service import evaluate_system_alerts
 from app.modules.shifts.models import Shift, ShiftStatus
 from app.modules.users.models import User, UserRole
 
@@ -699,31 +699,71 @@ def generate_store_reports(database: Session, period: str = "today") -> StoreRep
         else 0.0
     )
 
-    # 3. Top selling items
+    # 3. Top selling items (trending coffee from database)
     top_items_stmt = (
         select(
             OrderItem.menu_item_id,
             MenuItem.item_name,
+            MenuItem.base_price,
             func.sum(OrderItem.quantity).label("qty_sold"),
             func.sum(OrderItem.subtotal).label("total_item_sales"),
         )
         .join(MenuItem, OrderItem.menu_item_id == MenuItem.menu_item_id)
         .join(Order, OrderItem.order_id == Order.order_id)
         .where(*order_filter)
-        .group_by(OrderItem.menu_item_id, MenuItem.item_name)
+        .group_by(OrderItem.menu_item_id, MenuItem.item_name, MenuItem.base_price)
         .order_by(func.sum(OrderItem.quantity).desc())
         .limit(5)
     )
     top_items_rows = database.execute(top_items_stmt).all()
+
+    # If no sales in current period, fall back to real all-time top selling items from DB
+    if not top_items_rows:
+        all_time_stmt = (
+            select(
+                OrderItem.menu_item_id,
+                MenuItem.item_name,
+                MenuItem.base_price,
+                func.sum(OrderItem.quantity).label("qty_sold"),
+                func.sum(OrderItem.subtotal).label("total_item_sales"),
+            )
+            .join(MenuItem, OrderItem.menu_item_id == MenuItem.menu_item_id)
+            .join(Order, OrderItem.order_id == Order.order_id)
+            .where(Order.order_status.in_(valid_statuses))
+            .group_by(OrderItem.menu_item_id, MenuItem.item_name, MenuItem.base_price)
+            .order_by(func.sum(OrderItem.quantity).desc())
+            .limit(5)
+        )
+        top_items_rows = database.execute(all_time_stmt).all()
+
     top_selling_items = [
         TopSellingItem(
             menu_item_id=row.menu_item_id,
             item_name=row.item_name,
             quantity_sold=int(row.qty_sold or 0),
             total_sales=Decimal(str(row.total_item_sales or "0.00")),
+            price=Decimal(str(row.base_price or "0.00")),
         )
         for row in top_items_rows
     ]
+
+    # If still fewer than 5, supplement with real active menu items from database
+    if len(top_selling_items) < 5:
+        existing_ids = {it.menu_item_id for it in top_selling_items}
+        supplement_stmt = select(MenuItem).where(MenuItem.is_deleted.is_(False), MenuItem.is_available.is_(True))
+        if existing_ids:
+            supplement_stmt = supplement_stmt.where(~MenuItem.menu_item_id.in_(existing_ids))
+        extra_items = list(database.scalars(supplement_stmt.order_by(MenuItem.menu_item_id.asc()).limit(5 - len(top_selling_items))).all())
+        for extra in extra_items:
+            top_selling_items.append(
+                TopSellingItem(
+                    menu_item_id=extra.menu_item_id,
+                    item_name=extra.item_name,
+                    quantity_sold=0,
+                    total_sales=Decimal("0.00"),
+                    price=extra.base_price,
+                )
+            )
 
     # 4. Sales by Channel
     channel_stmt = (

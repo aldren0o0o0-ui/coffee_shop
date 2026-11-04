@@ -5,9 +5,17 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
+engine_kwargs = {"pool_pre_ping": True}
+if "sqlite" not in settings.database_url:
+    engine_kwargs.update({
+        "pool_size": settings.db_pool_size,
+        "max_overflow": settings.db_max_overflow,
+        "pool_timeout": settings.db_pool_timeout,
+    })
+
 engine = create_engine(
     settings.database_url,
-    pool_pre_ping=True,
+    **engine_kwargs,
 )
 
 SessionLocal = sessionmaker(

@@ -2,7 +2,7 @@ import logging
 import smtplib
 import ssl
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -72,7 +72,7 @@ def send_email_message(
         "subject": subject,
         "html_content": html_content,
         "text_content": text_content,
-        "timestamp": datetime.now(),
+        "timestamp": datetime.now(timezone.utc),
         "delivered_via": "smtp" if settings.smtp_host else "simulated_logger",
     }
     record_dispatched_email(record_entry)
@@ -336,7 +336,7 @@ Artisan Coffee & Warm Hospitality
                     <tr>
                         <td style="background-color: #fafaf9; border-top: 1px solid #f5f5f4; padding: 24px 30px; text-align: center;">
                             <p style="margin: 0; color: #78716c; font-size: 11px; line-height: 1.5;">
-                                &copy; {datetime.now().year} LDRN's Coffee Roastery. All rights reserved.<br>
+                                &copy; {datetime.now(timezone.utc).year} LDRN's Coffee Roastery. All rights reserved.<br>
                                 If you have questions about your order, please show this email to your barista or cashier upon arrival.
                             </p>
                         </td>
@@ -383,7 +383,7 @@ def send_payment_receipt_email(
     pickup_code = order.pickup_code or "READY"
     order_num = f"#{order.order_id}"
     paid_str = format_currency(payment.amount_paid)
-    paid_at_str = format_timestamp(payment.paid_at or datetime.now())
+    paid_at_str = format_timestamp(payment.paid_at or datetime.now(timezone.utc))
     method_str = payment.payment_method.value.upper() if hasattr(payment.payment_method, "value") else str(payment.payment_method).upper()
     tracking_url = f"{settings.frontend_url}/track"
 
@@ -589,7 +589,7 @@ Thank you for being part of the LDRN's Coffee family!
                     <tr>
                         <td style="background-color: #fafaf9; border-top: 1px solid #f5f5f4; padding: 24px 30px; text-align: center;">
                             <p style="margin: 0; color: #78716c; font-size: 11px; line-height: 1.5;">
-                                &copy; {datetime.now().year} LDRN's Coffee Roastery. All rights reserved.<br>
+                                &copy; {datetime.now(timezone.utc).year} LDRN's Coffee Roastery. All rights reserved.<br>
                                 Enjoy your coffee! Thank you for ordering with us.
                             </p>
                         </td>

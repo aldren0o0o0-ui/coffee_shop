@@ -1,8 +1,13 @@
 from fastapi import APIRouter, HTTPException, status
+
 from app.modules.auth.dependencies import CurrentAuthenticationDependency
-from app.modules.engagement.schemas import WinBackAudienceRequest, WinBackAudienceResponse
+from app.modules.engagement.schemas import (
+    WinBackAudienceRequest,
+    WinBackAudienceResponse,
+)
 from app.modules.engagement.service import get_win_back_audience
 from app.shared.dependencies import DatabaseDependency
+
 router = APIRouter(prefix="/engagement", tags=["Customer Engagement"])
 @router.post("/win-back/audience", response_model=WinBackAudienceResponse)
 def preview_win_back(payload: WinBackAudienceRequest, authentication: CurrentAuthenticationDependency, database: DatabaseDependency):

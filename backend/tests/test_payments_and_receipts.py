@@ -208,6 +208,12 @@ def test_successful_online_payment_and_receipt_generation(db_session):
     response = client.get(payment.receipt_pdf_url)
     assert response.status_code == 200
     assert response.content.startswith(b"%PDF-")
+    assert "inline" in response.headers.get("content-disposition", "")
+
+    # Verify download=1 sets attachment header
+    response_download = client.get(f"{payment.receipt_pdf_url}?download=1")
+    assert response_download.status_code == 200
+    assert "attachment" in response_download.headers.get("content-disposition", "")
 
 
 def test_failed_payment_on_insufficient_inventory_and_no_receipt(db_session):

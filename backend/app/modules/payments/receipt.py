@@ -33,9 +33,25 @@ def generate_receipt_pdf(order: Order, payment: Payment | None = None) -> str:
     filename = f"receipt_{uuid.uuid4().hex}.pdf"
     filepath = os.path.join(RECEIPTS_DIR, filename)
 
-    # 80mm width standard thermal receipt, variable height
+    # 80mm width standard thermal receipt with dynamic height
+    base_height_mm = 140
+    if order.pickup_code:
+        base_height_mm += 25
+    if payment and payment.transaction_reference:
+        base_height_mm += 8
+    if order.discount_amount and Decimal(order.discount_amount) > 0:
+        base_height_mm += 6
+
+    items_height_mm = 0
+    for item in order.order_items:
+        items_height_mm += 9
+        if item.addons:
+            items_height_mm += 4 * len(item.addons)
+        if item.special_instructions:
+            items_height_mm += 6
+
     page_width = 80 * mm
-    page_height = 200 * mm
+    page_height = max(190, base_height_mm + items_height_mm) * mm
 
     doc = SimpleDocTemplate(
         filepath,
@@ -122,12 +138,28 @@ def generate_receipt_pdf(order: Order, payment: Payment | None = None) -> str:
 
     order_date_str = order.order_date.strftime("%Y-%m-%d %I:%M %p") if hasattr(order.order_date, "strftime") else str(order.order_date)
 
+    cashier_name = None
+    if hasattr(order, "staff_user") and order.staff_user and order.staff_user.first_name:
+        cashier_name = f"{order.staff_user.first_name} {order.staff_user.last_name or ''}".strip()
+    elif hasattr(order, "events") and order.events:
+        for ev in reversed(order.events):
+            if hasattr(ev, "staff_user") and ev.staff_user and ev.staff_user.first_name:
+                cashier_name = f"{ev.staff_user.first_name} {ev.staff_user.last_name or ''}".strip()
+                break
+    if not cashier_name:
+        cashier_name = "Counter Register" if order.order_channel.value == "in_store" else "Online System"
+
     meta_data = [
         [Paragraph("Order #:", body_bold), Paragraph(str(order.order_id), body_style)],
         [Paragraph("Date/Time:", body_bold), Paragraph(order_date_str, body_style)],
         [Paragraph("Customer:", body_bold), Paragraph(customer_name, body_style)],
+        [Paragraph("Cashier:", body_bold), Paragraph(cashier_name, body_style)],
         [Paragraph("Order Type:", body_bold), Paragraph(f"{order.order_channel.value.upper()} • {order.order_type.value.upper()}", body_style)],
     ]
+
+    if payment and payment.transaction_reference:
+        meta_data.append([Paragraph("Trans Ref:", body_bold), Paragraph(payment.transaction_reference, body_style)])
+
     meta_table = Table(meta_data, colWidths=[24 * mm, 48 * mm])
     meta_table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -153,6 +185,8 @@ def generate_receipt_pdf(order: Order, payment: Payment | None = None) -> str:
             addon_names = ", ".join(a.menu_item_addon.addon_name for a in item.addons if a.menu_item_addon)
             if addon_names:
                 desc += f"<br/><font size=6 color='#78716c'>+ {addon_names}</font>"
+        if item.special_instructions:
+            desc += f"<br/><font size=6 color='#b45309'>Note: {item.special_instructions}</font>"
 
         item_rows.append([
             Paragraph(desc, body_style),
@@ -174,9 +208,14 @@ def generate_receipt_pdf(order: Order, payment: Payment | None = None) -> str:
     # 5. Financial Summary & Tender
     total_data = [
         [Paragraph("Subtotal:", body_style), Paragraph(f"₱{Decimal(order.subtotal):.2f}", body_style)],
+    ]
+    if order.discount_amount and Decimal(order.discount_amount) > 0:
+        total_data.append([Paragraph("Discount:", body_style), Paragraph(f"-₱{Decimal(order.discount_amount):.2f}", body_style)])
+
+    total_data.extend([
         [Paragraph("Tax (8%):", body_style), Paragraph(f"₱{Decimal(order.tax_amount):.2f}", body_style)],
         [Paragraph("TOTAL DUE:", body_bold), Paragraph(f"₱{Decimal(order.total_amount):.2f}", body_bold)],
-    ]
+    ])
 
     if payment:
         method_str = payment.payment_method.value.upper()

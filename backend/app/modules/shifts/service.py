@@ -1,10 +1,19 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
 from app.modules.payments.models import Payment, PaymentMethod, PaymentStatus
-from app.modules.shifts.models import CashMovement, CashMovementType, Shift, ShiftStatus, VarianceReviewStatus
+from app.modules.shifts.models import (
+    CashMovement,
+    CashMovementType,
+    Shift,
+    ShiftStatus,
+    VarianceReviewStatus,
+)
+
 
 def add_cash_movement(database: Session, shift: Shift, movement_type: CashMovementType, amount: Decimal, reason: str, user_id: int) -> CashMovement:
     if shift.status != ShiftStatus.OPEN: raise HTTPException(status_code=400, detail="Cash movements require an open shift.")

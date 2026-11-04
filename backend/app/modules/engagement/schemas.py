@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class WinBackAudienceResponse(BaseModel):
     inactive_days: int
     eligible_customers: int

@@ -1,4 +1,5 @@
 from app.database.session import SessionLocal
+from app.modules.auth.models import AuthSession
 from app.modules.inventory.models import InventoryTransaction
 from app.modules.orders.models import Order
 from app.modules.procurement.models import PurchaseRequest

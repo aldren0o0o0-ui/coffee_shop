@@ -127,6 +127,7 @@ class TopSellingItem(BaseModel):
     item_name: str
     quantity_sold: int
     total_sales: Decimal
+    price: Decimal | None = None
 
 
 class ChannelSales(BaseModel):

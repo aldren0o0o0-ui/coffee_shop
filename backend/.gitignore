@@ -1,0 +1,37 @@
+# Real environment files
+.env
+.env.*
+!.env.example
+
+# Temporary migration, comparison & sync scripts
+compare.py
+compare_db_schema.py
+inspect_data.py
+recover_data.py
+sync_aiven_to_match_local.py
+sync_missing_data.py
+local_schema.txt
+aiven_schema.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# IDE and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs and local files
+*.log
+coverage/
+htmlcov/
+
+# Runtime-generated customer documents and test artifacts
+uploads/receipts/
+tests/.test_database.sqlite3

@@ -2,6 +2,17 @@
 .env
 .env.*
 !.env.example
+pass
+
+# Migration, compare & sync scratch files
+backend/compare.py
+backend/compare_db_schema.py
+backend/inspect_data.py
+backend/recover_data.py
+backend/sync_aiven_to_match_local.py
+backend/sync_missing_data.py
+backend/local_schema.txt
+backend/aiven_schema.txt
 
 # Python
 __pycache__/

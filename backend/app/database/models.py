@@ -21,13 +21,13 @@ from app.modules.menu.models import (
     MenuItemIngredient,
     MenuItemSize,
 )
+from app.modules.notifications.models import AlertPreference, SystemAlert
 from app.modules.orders.models import (
     Order,
     OrderEvent,
     OrderItem,
     OrderItemAddon,
 )
-from app.modules.notifications.models import AlertPreference, SystemAlert
 from app.modules.payments.models import Payment
 from app.modules.procurement.models import (
     PurchaseRequest,
@@ -43,8 +43,8 @@ __all__ = [
     "Branch",
     "BranchTransfer",
     "BranchTransferItem",
-    "Customer",
     "CashMovement",
+    "Customer",
     "InventoryItem",
     "InventoryTransaction",
     "LoyaltyTransaction",

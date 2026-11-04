@@ -6,8 +6,213 @@ import {
   lookupPendingCounterOrders,
   payPendingCounterOrder,
 } from "../api/ordersApi";
-import { downloadReceipt, printReceipt } from "../utils/receiptUtils";
+import { downloadReceipt, printReceipt, printThermalReceipt } from "../utils/receiptUtils";
 import { getImageUrl } from "../../menu/utils/image";
+import { useAuth } from "../../auth/context/useAuth";
+import ThermalReceipt from "../components/ThermalReceipt";
+
+// Specialized SVG illustration for drinks that don't have an uploaded photo
+function DrinkIllustration({ className = "w-16 h-24" }) {
+  return (
+    <svg viewBox="0 0 80 120" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="coffeeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#c89666" />
+          <stop offset="30%" stopColor="#92400e" />
+          <stop offset="70%" stopColor="#451a03" />
+          <stop offset="100%" stopColor="#1e1008" />
+        </linearGradient>
+        <linearGradient id="foamGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#fef3c7" />
+        </linearGradient>
+      </defs>
+      {/* Cup glass body */}
+      <path
+        d="M17 18 L23 106 C23 112 28 116 34 116 L46 116 C52 116 57 112 57 106 L63 18 Z"
+        fill="url(#coffeeGradient)"
+        stroke="#e5e7eb"
+        strokeWidth="1.5"
+      />
+      {/* Milk swirl layer */}
+      <path
+        d="M19 42 Q 40 56, 61 42 L62 30 Q 40 38, 18 30 Z"
+        fill="#fdfbf7"
+        opacity="0.88"
+      />
+      {/* Top cream / foam */}
+      <ellipse cx="40" cy="18" rx="23" ry="7" fill="url(#foamGradient)" />
+      {/* Cocoa sprinkles */}
+      <circle cx="34" cy="17" r="1.5" fill="#78350f" opacity="0.6" />
+      <circle cx="44" cy="19" r="1.3" fill="#78350f" opacity="0.6" />
+      <circle cx="40" cy="15" r="1" fill="#78350f" opacity="0.5" />
+      {/* Glass reflection */}
+      <path
+        d="M21 26 L25 100"
+        stroke="#ffffff"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        opacity="0.45"
+      />
+    </svg>
+  );
+}
+
+// Product Card Component matching the reference layout
+function ProductCard({
+  item,
+  onAddToCart,
+  onOpenCustomizer,
+  isInCart,
+}) {
+  const [selectedSize, setSelectedSize] = useState(() => {
+    return item.sizes?.find((s) => s.is_default) || item.sizes?.[0] || null;
+  });
+  const [quantity, setQuantity] = useState(1);
+  const [justAdded, setJustAdded] = useState(false);
+
+  const sizeAdjustment = selectedSize ? Number(selectedSize.price_adjustment || 0) : 0;
+  const currentUnitPrice = Number(item.base_price) + sizeAdjustment;
+
+  function handleAdd() {
+    onAddToCart({
+      item,
+      size: selectedSize,
+      quantity,
+    });
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1600);
+  }
+
+  const isButtonActive = justAdded || isInCart;
+
+  return (
+    <div className="group flex flex-col justify-between rounded-3xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all duration-200 hover:border-amber-700/30 hover:shadow-md">
+      {/* Upper content row */}
+      <div className="flex gap-4">
+        {/* Drink Image / Illustration */}
+        <div className="relative flex h-32 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-stone-100 bg-[#faf7f3] sm:h-36 sm:w-28">
+          {item.image_url ? (
+            <img
+              src={getImageUrl(item.image_url)}
+              alt={item.item_name}
+              className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <DrinkIllustration className="h-28 w-20 transition-transform duration-300 group-hover:scale-105" />
+          )}
+          {!item.is_available && (
+            <div className="absolute inset-0 flex items-center justify-center bg-stone-900/60 backdrop-blur-2xs">
+              <span className="rounded-md bg-rose-900 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                Sold Out
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Product Details */}
+        <div className="flex flex-1 flex-col justify-between min-w-0">
+          <div>
+            {/* Title & Price Header */}
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 className="font-bold text-stone-900 text-sm sm:text-base truncate group-hover:text-amber-950">
+                {item.item_name}
+              </h3>
+              <span className="shrink-0 font-bold text-amber-800 text-sm sm:text-base">
+                ₱{currentUnitPrice.toFixed(2)}
+              </span>
+            </div>
+
+            {/* Description */}
+            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-stone-400">
+              {item.description || "The combination of coffee, milk, and specialty roast creates a velvety taste."}
+            </p>
+          </div>
+
+          {/* Size Selector Row */}
+          <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+            {item.sizes && item.sizes.length > 0 ? (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-semibold text-stone-400 mr-0.5">Size</span>
+                {item.sizes.map((s) => {
+                  const isSelected = selectedSize?.menu_item_size_id === s.menu_item_size_id;
+                  return (
+                    <button
+                      key={s.menu_item_size_id}
+                      type="button"
+                      disabled={!item.is_available}
+                      onClick={() => setSelectedSize(s)}
+                      className={`rounded-full px-3 py-1 text-xs font-bold transition shadow-2xs ${
+                        isSelected
+                          ? "bg-stone-900 text-white shadow-xs"
+                          : "border border-stone-200 bg-stone-50/80 text-stone-600 hover:border-stone-400 hover:bg-stone-100"
+                      }`}
+                    >
+                      {s.size_name}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <span className="text-[11px] font-semibold text-stone-400">Standard Size</span>
+            )}
+
+            {/* Customizer / Options link */}
+            {item.addons && item.addons.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onOpenCustomizer(item)}
+                className="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline ml-auto"
+              >
+                + Addons
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom controls row */}
+      <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-3">
+        {/* Stepper pill */}
+        <div className="inline-flex items-center rounded-full border border-stone-200 bg-stone-50/90 px-2 py-1 gap-2.5">
+          <button
+            type="button"
+            disabled={quantity <= 1 || !item.is_available}
+            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+            className="flex h-5 w-5 items-center justify-center rounded-full text-stone-500 hover:bg-stone-200 hover:text-stone-900 font-bold transition disabled:opacity-30"
+          >
+            -
+          </button>
+          <span className="w-4 text-center text-xs font-black text-stone-900">
+            {quantity}
+          </span>
+          <button
+            type="button"
+            disabled={!item.is_available}
+            onClick={() => setQuantity((q) => q + 1)}
+            className="flex h-5 w-5 items-center justify-center rounded-full text-stone-500 hover:bg-stone-200 hover:text-stone-900 font-bold transition disabled:opacity-30"
+          >
+            +
+          </button>
+        </div>
+
+        {/* Add to Cart button */}
+        <button
+          type="button"
+          disabled={!item.is_available}
+          onClick={handleAdd}
+          className={`rounded-full px-5 py-2 text-xs font-bold transition-all duration-200 shadow-xs ${
+            isButtonActive
+              ? "bg-amber-800 text-white hover:bg-amber-900"
+              : "border border-amber-800/40 text-amber-800 hover:bg-amber-800 hover:text-white"
+          } disabled:cursor-not-allowed disabled:opacity-50`}
+        >
+          {isButtonActive ? "Added to cart" : "Add to Cart"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function PosPage() {
   const location = useLocation();
@@ -27,21 +232,36 @@ export default function PosPage() {
   // Filters for Register
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [availabilityFilter, setAvailabilityFilter] = useState("all"); // "all" | "in_stock"
+  const [sortBy, setSortBy] = useState("default"); // "default" | "price_asc" | "price_desc" | "name"
 
   // Register Ticket & POS Cart
   const [cart, setCart] = useState([]);
   const [customerName, setCustomerName] = useState("Walk-in Guest");
   const [customerEmail, setCustomerEmail] = useState("");
-  const [orderType, setOrderType] = useState("dine_in");
+  const [orderType, setOrderType] = useState("dine_in"); // "dine_in" | "takeout" | "delivery"
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [amountTendered, setAmountTendered] = useState("");
   const [editingPendingOrder, setEditingPendingOrder] = useState(null);
+
+  // Live order sequence reference number for UI display (matching Order #3243 in image)
+  const [orderReferenceNumber] = useState(() => {
+    return Math.floor(1000 + Math.random() * 9000).toString();
+  });
 
   // Customization drawer/modal for selected item
   const [customizingItem, setCustomizingItem] = useState(null);
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [specialInstructions, setSpecialInstructions] = useState("");
+
+  // Staff user context & Receipt preview
+  const { user } = useAuth();
+  const staffName = user
+    ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.username
+    : "Counter Cashier";
+  const staffEmail = user?.email || "cashier@ldrncoffee.com";
 
   // Checkout submission
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,7 +309,7 @@ export default function PosPage() {
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return allItems.filter((item) => {
+    let items = allItems.filter((item) => {
       const matchesCat =
         selectedCategory === "all" ||
         item.category_name.toLowerCase() === selectedCategory.toLowerCase();
@@ -97,12 +317,67 @@ export default function PosPage() {
         !query ||
         item.item_name.toLowerCase().includes(query) ||
         (item.description && item.description.toLowerCase().includes(query));
-      return matchesCat && matchesSearch;
+      const matchesAvail =
+        availabilityFilter === "all" || (availabilityFilter === "in_stock" && item.is_available);
+      return matchesCat && matchesSearch && matchesAvail;
     });
-  }, [allItems, selectedCategory, searchQuery]);
 
-  // Open item customization
-  function handleSelectDrink(item) {
+    if (sortBy === "price_asc") {
+      items = [...items].sort((a, b) => Number(a.base_price) - Number(b.base_price));
+    } else if (sortBy === "price_desc") {
+      items = [...items].sort((a, b) => Number(b.base_price) - Number(a.base_price));
+    } else if (sortBy === "name") {
+      items = [...items].sort((a, b) => a.item_name.localeCompare(b.item_name));
+    }
+
+    return items;
+  }, [allItems, selectedCategory, searchQuery, availabilityFilter, sortBy]);
+
+  // Direct add from card
+  function handleDirectAddToCart({ item, size, quantity }) {
+    const sizeAdjustment = size ? Number(size.price_adjustment || 0) : 0;
+    const unitPrice = Number(item.base_price) + sizeAdjustment;
+
+    const cartEntry = {
+      cart_id: `pos-${Date.now()}-${Math.random()}`,
+      menu_item_id: item.menu_item_id,
+      item_name: item.item_name,
+      image_url: item.image_url,
+      menu_item_size_id: size ? size.menu_item_size_id : null,
+      size_name: size ? size.size_name : null,
+      addon_ids: [],
+      addons: [],
+      special_instructions: null,
+      unit_price: unitPrice,
+      quantity: quantity || 1,
+    };
+
+    if (activeMode === "lookup" && selectedPendingOrder) {
+      setPendingItems((prev) => [...prev, cartEntry]);
+    } else {
+      setCart((prev) => {
+        const existingIdx = prev.findIndex(
+          (c) =>
+            c.menu_item_id === cartEntry.menu_item_id &&
+            c.menu_item_size_id === cartEntry.menu_item_size_id &&
+            (!c.addons || c.addons.length === 0) &&
+            !c.special_instructions
+        );
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            quantity: updated[existingIdx].quantity + cartEntry.quantity,
+          };
+          return updated;
+        }
+        return [...prev, cartEntry];
+      });
+    }
+  }
+
+  // Open item customization modal
+  function handleOpenCustomizer(item) {
     setCustomizingItem(item);
     const defaultSize = item.sizes?.find((s) => s.is_default) || item.sizes?.[0] || null;
     setSelectedSize(defaultSize);
@@ -125,6 +400,7 @@ export default function PosPage() {
       cart_id: `pos-${Date.now()}-${Math.random()}`,
       menu_item_id: customizingItem.menu_item_id,
       item_name: customizingItem.item_name,
+      image_url: customizingItem.image_url,
       menu_item_size_id: selectedSize ? selectedSize.menu_item_size_id : null,
       size_name: selectedSize ? selectedSize.size_name : null,
       addon_ids: selectedAddons.map((a) => a.menu_item_addon_id),
@@ -157,6 +433,10 @@ export default function PosPage() {
     );
   }
 
+  function removeCartItem(cartId) {
+    setCart((prev) => prev.filter((item) => item.cart_id !== cartId));
+  }
+
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
   }, [cart]);
@@ -170,10 +450,10 @@ export default function PosPage() {
 
   // Submit POS Order
   async function handleCheckout(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (cart.length === 0) return;
 
-    if (paymentMethod === "cash" && numericTendered < total) {
+    if (paymentMethod === "cash" && amountTendered !== "" && numericTendered < total) {
       setPosError(`Amount tendered (₱${numericTendered.toFixed(2)}) must be at least total due (₱${total.toFixed(2)}).`);
       return;
     }
@@ -201,7 +481,7 @@ export default function PosPage() {
       if (editingPendingOrder) {
         const payload = {
           payment_method: paymentMethod,
-          amount_tendered: paymentMethod === "cash" ? numericTendered : null,
+          amount_tendered: paymentMethod === "cash" ? (numericTendered || total) : null,
           items: itemsPayload,
         };
         result = await payPendingCounterOrder(editingPendingOrder.order_id, payload);
@@ -209,9 +489,9 @@ export default function PosPage() {
         const payload = {
           customer_name: customerName.trim() || "Walk-in Guest",
           customer_email: customerEmail.trim() || null,
-          order_type: orderType,
+          order_type: orderType === "delivery" ? "takeout" : orderType,
           payment_method: paymentMethod,
-          amount_tendered: paymentMethod === "cash" ? numericTendered : null,
+          amount_tendered: paymentMethod === "cash" ? (numericTendered || total) : null,
           items: itemsPayload,
         };
         result = await createPosOrder(payload);
@@ -227,7 +507,7 @@ export default function PosPage() {
       console.error("POS sale failed:", err);
       const detail = err.response?.data?.detail;
       if (err.response?.status === 409 || (detail && detail.includes("stock"))) {
-        setPosError("⚠️ Insufficient Inventory: One of the selected drinks cannot be prepared due to low stock.");
+        setPosError("Insufficient inventory: One of the selected items cannot be prepared due to low stock.");
       } else {
         setPosError(detail || "Failed to submit POS register sale.");
       }
@@ -267,7 +547,6 @@ export default function PosPage() {
     : pendingTotal;
   const counterChangeDue = counterNumericTendered >= pendingTotal ? counterNumericTendered - pendingTotal : 0;
 
-  // Automatically synchronize cash amount tendered to match pendingTotal
   useEffect(() => {
     if (selectedPendingOrder && pendingTotal > 0) {
       setCounterAmountTendered((prev) => {
@@ -296,6 +575,7 @@ export default function PosPage() {
         cart_id: `pending-${it.order_item_id || it.menu_item_id}-${Date.now()}-${Math.random()}`,
         menu_item_id: it.menu_item_id,
         item_name: it.item_name,
+        image_url: it.image_url,
         menu_item_size_id: it.menu_item_size_id || null,
         size_name: it.size_name || null,
         addon_ids: addons.map((a) => a.addon_id || a.menu_item_addon_id).filter(Boolean),
@@ -374,7 +654,6 @@ export default function PosPage() {
       setActiveMode("lookup");
       if (qRef) {
         setLookupQuery(qRef);
-        // Load all pending orders so the cashier sees the full list, and auto-select the targeted ref
         loadPendingOrders("", qRef);
       } else {
         loadPendingOrders("");
@@ -383,7 +662,7 @@ export default function PosPage() {
   }, [location.key, location.state, searchParams]);
 
   async function handleConfirmCounterPayment(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!selectedPendingOrder) return;
 
     if (pendingItems.length === 0) {
@@ -441,573 +720,176 @@ export default function PosPage() {
 
   return (
     <div className="space-y-6">
-      {/* HEADER WITH MODE TABS */}
-      <header className="flex flex-col justify-between gap-4 rounded-3xl border border-stone-200 bg-white p-6 shadow-xs sm:flex-row sm:items-center sm:p-8">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-100 text-xl font-bold text-amber-950">
-              🖥️
-            </span>
-            <h1 className="text-xl font-black tracking-tight text-stone-900 sm:text-2xl">
-              Point of Sale Register
-            </h1>
+      {/* ========================================================================= */}
+      {/* TOP BAR: SEARCH WITH FILTER PILL & USER PROFILE (REFERENCE LAYOUT)        */}
+      {/* ========================================================================= */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Search Bar & Filter Container */}
+        <div className="relative flex-1 max-w-2xl">
+          <div className="flex items-center rounded-full border border-stone-200/90 bg-white px-4 py-1.5 shadow-2xs transition-all focus-within:border-amber-700 focus-within:ring-2 focus-within:ring-amber-200/50">
+            <span className="text-stone-400 pl-1 pr-2 text-sm">🔍</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="w-full bg-transparent text-sm font-semibold text-stone-900 placeholder:text-stone-400 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-stone-400 hover:text-stone-600 px-1 text-xs"
+              >
+                ✕
+              </button>
+            )}
+            {/* Orange / Amber Filter Button */}
+            <button
+              type="button"
+              onClick={() => setShowFilterDropdown((v) => !v)}
+              className="ml-2 flex items-center gap-1.5 rounded-full bg-amber-800 hover:bg-amber-900 px-4 py-2 text-xs font-bold text-white shadow-xs transition shrink-0"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Filter</span>
+            </button>
           </div>
-          <p className="mt-1 text-xs text-stone-500 sm:text-sm">
-            Fast counter checkout, pending order retrieval (REF-XXXX), and instant receipt printing.
-          </p>
-        </div>
 
-        {/* MODE SELECTOR */}
-        <div className="flex items-center rounded-2xl border border-stone-200 bg-stone-50 p-1">
-          <button
-            type="button"
-            onClick={() => setActiveMode("register")}
-            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition ${
-              activeMode === "register"
-                ? "bg-white text-stone-900 shadow-xs"
-                : "text-stone-500 hover:text-stone-800"
-            }`}
-          >
-            <span>🛒 New Counter Sale</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMode("lookup")}
-            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition ${
-              activeMode === "lookup"
-                ? "bg-amber-900 text-white shadow-xs"
-                : "text-stone-500 hover:text-stone-800"
-            }`}
-          >
-            <span>🔍 Look Up Pending Order</span>
-          </button>
-        </div>
-      </header>
-
-      {/* ========================================================================= */}
-      {/* MODE 1: LOOK UP PENDING ORDER                                             */}
-      {/* ========================================================================= */}
-      {activeMode === "lookup" && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          {/* SEARCH & FILTER BAR */}
-          <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
-                  <span>Pending Pay-at-Counter Orders</span>
-                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900 border border-amber-300">
-                    {lookupResults.length} active
-                  </span>
-                </h2>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  All active pending counter orders are displayed automatically below. Select any order to edit quantities, add menu items, or tender payment.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
+          {/* Filter Popover Dropdown */}
+          {showFilterDropdown && (
+            <div className="absolute left-0 mt-2 z-30 w-72 rounded-2xl border border-stone-200 bg-white p-4 shadow-xl space-y-3">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                <span className="text-xs font-black uppercase text-stone-800">Filter Menu</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setLookupQuery("");
-                    loadPendingOrders("");
-                  }}
-                  className="flex items-center gap-1.5 rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100 transition shadow-2xs"
-                  title="Reload all pending orders"
+                  onClick={() => setShowFilterDropdown(false)}
+                  className="text-stone-400 hover:text-stone-600 text-xs font-bold"
                 >
-                  <span>🔄 Refresh List</span>
+                  ✕
                 </button>
               </div>
-            </div>
 
-            <form onSubmit={handleLookupSearch} className="flex flex-col sm:flex-row gap-2 max-w-2xl">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={lookupQuery}
-                  onChange={(e) => {
-                    setLookupQuery(e.target.value);
-                    if (!e.target.value.trim()) {
-                      loadPendingOrders("");
-                    }
-                  }}
-                  placeholder="Filter by Reference Code (e.g. REF-4821), customer name, or email..."
-                  className="w-full rounded-2xl border border-stone-300 bg-stone-50 py-3 pl-10 pr-10 text-xs font-bold text-stone-900 placeholder:text-stone-400 focus:border-amber-900 focus:bg-white focus:outline-none"
-                />
-                <span className="absolute left-3.5 top-3.5 text-xs text-stone-400">🔍</span>
-                {lookupQuery && (
+              <div>
+                <label className="text-[11px] font-bold text-stone-600 block mb-1">Availability</label>
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      setLookupQuery("");
-                      loadPendingOrders("");
-                    }}
-                    className="absolute right-3.5 top-3 text-xs text-stone-400 hover:text-stone-700"
-                    title="Clear filter"
+                    onClick={() => setAvailabilityFilter("all")}
+                    className={`rounded-xl py-1.5 text-xs font-bold transition ${
+                      availabilityFilter === "all"
+                        ? "bg-stone-900 text-white"
+                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    }`}
                   >
-                    ✕
+                    All Items
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => setAvailabilityFilter("in_stock")}
+                    className={`rounded-xl py-1.5 text-xs font-bold transition ${
+                      availabilityFilter === "in_stock"
+                        ? "bg-stone-900 text-white"
+                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    }`}
+                  >
+                    In Stock Only
+                  </button>
+                </div>
               </div>
-              <button
-                type="submit"
-                disabled={isSearchingLookup}
-                className="rounded-2xl bg-amber-900 px-6 py-3 text-xs font-black text-white shadow-xs hover:bg-amber-950 disabled:opacity-50 transition"
-              >
-                {isSearchingLookup ? "Searching..." : "Filter Orders"}
-              </button>
-              {lookupQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLookupQuery("");
-                    loadPendingOrders("");
-                  }}
-                  className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs font-bold text-stone-700 hover:bg-stone-100 transition"
+
+              <div>
+                <label className="text-[11px] font-bold text-stone-600 block mb-1">Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs font-semibold text-stone-900 focus:outline-none"
                 >
-                  Show All ({lookupResults.length})
-                </button>
-              )}
-            </form>
-
-            {lookupError && (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-800">
-                ⚠️ {lookupError}
+                  <option value="default">Default Catalog Order</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                  <option value="name">Alphabetical (A - Z)</option>
+                </select>
               </div>
-            )}
-          </section>
-
-          {/* TWO-COLUMN WORKSPACE: LEFT LIST & RIGHT EDITABLE REVIEW */}
-          <div className="grid gap-6 lg:grid-cols-12">
-            {/* LEFT 6 COLS: ORDERS LIST */}
-            <div className="lg:col-span-6 space-y-3">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-stone-500">
-                  Select Order to Review ({lookupResults.length})
-                </span>
-                <span className="text-[11px] text-stone-400">
-                  Auto-loaded in real time
-                </span>
-              </div>
-
-              {isSearchingLookup ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((n) => (
-                    <div key={n} className="animate-pulse rounded-3xl border border-stone-200 bg-white p-5 space-y-2">
-                      <div className="h-4 w-32 bg-stone-200 rounded" />
-                      <div className="h-3 w-48 bg-stone-100 rounded" />
-                    </div>
-                  ))}
-                </div>
-              ) : lookupResults.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-stone-200 bg-white p-12 text-center text-xs text-stone-500 space-y-2">
-                  <span className="text-3xl block">⏳</span>
-                  <p className="font-bold text-stone-800">
-                    {lookupQuery ? `No pending order found matching "${lookupQuery}"` : "No pending counter orders right now"}
-                  </p>
-                  <p className="text-stone-400 text-[11px]">
-                    {lookupQuery
-                      ? "Check with the customer or clear filter to display all pending orders."
-                      : "When customers choose 'Pay at Counter' online, their orders appear here automatically."}
-                  </p>
-                  {lookupQuery && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLookupQuery("");
-                        loadPendingOrders("");
-                      }}
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-black text-amber-900 hover:underline"
-                    >
-                      Show All Pending Orders
-                    </button>
-                  )}
-                </div>
-              ) : (
-                lookupResults.map((order) => {
-                  const isSelected = selectedPendingOrder?.order_id === order.order_id;
-                  return (
-                    <div
-                      key={order.order_id}
-                      onClick={() => handleSelectPendingOrder(order)}
-                      className={`cursor-pointer w-full text-left rounded-3xl border p-5 transition shadow-xs ${
-                        isSelected
-                          ? "border-amber-900 bg-amber-50/60 ring-2 ring-amber-400"
-                          : "border-stone-200 bg-white hover:border-stone-300"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="rounded-lg bg-amber-200/70 px-2 py-0.5 text-xs font-black text-amber-950">
-                              {order.reference_code || `REF-${order.order_id}`}
-                            </span>
-                            <span className="font-extrabold text-stone-900 text-sm">
-                              {order.customer_name}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-stone-500 line-clamp-2">
-                            {order.items?.map((i) => `${i.quantity}x ${i.item_name}`).join(", ")}
-                          </p>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span className="text-sm font-black text-stone-900">
-                            ₱{Number(order.total_amount).toFixed(2)}
-                          </span>
-                          <span className="block text-[10px] font-bold text-amber-800 uppercase mt-0.5">
-                            Awaiting Payment
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2 text-xs">
-                        <span className="text-[11px] text-stone-400">
-                          {order.order_type === "takeout" ? "🛍️ Takeout" : "🍽️ Dine-In"} • #{order.order_id}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectPendingOrder(order);
-                          }}
-                          className="inline-flex items-center gap-1 font-bold text-amber-900 hover:text-amber-950 underline text-xs"
-                        >
-                          ✏️ Edit &amp; Review →
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
             </div>
+          )}
+        </div>
 
-            {/* RIGHT 6 COLS: EDITABLE PENDING ORDER REVIEW & CHARGE TERMINAL */}
-            <div className="lg:col-span-6">
-              {selectedPendingOrder ? (
-                <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs space-y-4 sticky top-6">
-                  {/* HEADER */}
-                  <div className="flex items-center justify-between border-b border-stone-100 pb-3 gap-2">
-                    <div>
-                      <span className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider block">
-                        Pending Order Review &amp; Edit
-                      </span>
-                      <h3 className="text-lg font-black text-stone-900">
-                        {selectedPendingOrder.reference_code || `REF-${selectedPendingOrder.order_id}`} • {selectedPendingOrder.customer_name}
-                      </h3>
-                    </div>
+        {/* Right Section: Mode Tabs & Cashier Profile Card */}
+        <div className="flex items-center gap-3">
+          {/* Workstation Mode Switcher */}
+          <div className="flex items-center rounded-full bg-stone-100/90 p-1 border border-stone-200/80">
+            <button
+              type="button"
+              onClick={() => setActiveMode("register")}
+              className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                activeMode === "register"
+                  ? "bg-amber-800 text-white shadow-xs"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              New Sale
+            </button>
 
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-900 border border-amber-300">
-                        Awaiting Payment
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* ORDER ITEMS HEADER & ADD DRINK BUTTON */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-stone-700">
-                      Order Items ({pendingItems.length})
-                    </span>
-
-                    {/* ADD DRINK FROM MENU POPUP/DROPDOWN */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowAddDrinkDropdown((prev) => !prev)}
-                        className="flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-900 hover:bg-amber-100 transition shadow-2xs"
-                      >
-                        <span>➕ Add Drink from Menu</span>
-                      </button>
-
-                      {showAddDrinkDropdown && (
-                        <div className="absolute right-0 top-8 z-30 w-72 rounded-2xl border border-stone-200 bg-white p-3 shadow-xl space-y-2 animate-in fade-in duration-100">
-                          <div className="flex items-center justify-between border-b border-stone-100 pb-1.5">
-                            <span className="text-xs font-black text-stone-900">Add Menu Drink</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAddDrinkDropdown(false);
-                                setAddDrinkSearch("");
-                              }}
-                              className="text-stone-400 hover:text-stone-700 text-xs"
-                            >
-                              ✕
-                            </button>
-                          </div>
-
-                          <input
-                            type="text"
-                            value={addDrinkSearch}
-                            onChange={(e) => setAddDrinkSearch(e.target.value)}
-                            placeholder="Search drinks..."
-                            className="w-full rounded-xl border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs text-stone-800 placeholder:text-stone-400 focus:border-amber-900 focus:bg-white focus:outline-none"
-                            autoFocus
-                          />
-
-                          <div className="max-h-52 overflow-y-auto divide-y divide-stone-100 space-y-1">
-                            {allItems
-                              .filter((it) => {
-                                const q = addDrinkSearch.trim().toLowerCase();
-                                if (!q) return true;
-                                return (
-                                  it.item_name.toLowerCase().includes(q) ||
-                                  (it.category_name && it.category_name.toLowerCase().includes(q))
-                                );
-                              })
-                              .map((drink) => (
-                                <button
-                                  key={drink.menu_item_id}
-                                  type="button"
-                                  onClick={() => {
-                                    setShowAddDrinkDropdown(false);
-                                    setAddDrinkSearch("");
-                                    handleSelectDrink(drink);
-                                  }}
-                                  className="w-full py-1.5 px-1 text-left flex items-center justify-between hover:bg-amber-50/70 rounded-lg transition"
-                                >
-                                  <div>
-                                    <span className="text-xs font-bold text-stone-900 block">
-                                      {drink.item_name}
-                                    </span>
-                                    <span className="text-[10px] text-stone-400">
-                                      {drink.category_name}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs font-black text-amber-900">
-                                    ₱{Number(drink.base_price).toFixed(2)}
-                                  </span>
-                                </button>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* EDITABLE ITEMS LIST */}
-                  <div className="space-y-2 max-h-56 overflow-y-auto divide-y divide-stone-100 border-y border-stone-100 py-2">
-                    {pendingItems.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-stone-400 italic">
-                        No items in this order. Add a drink above or re-select the order.
-                      </div>
-                    ) : (
-                      pendingItems.map((item) => (
-                        <div key={item.cart_id} className="py-2.5 text-xs flex justify-between items-start gap-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-stone-900">
-                                {item.item_name}
-                              </span>
-                              {item.size_name && (
-                                <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold text-stone-600">
-                                  {item.size_name}
-                                </span>
-                              )}
-                            </div>
-
-                            {item.addons && item.addons.length > 0 && (
-                              <div className="text-[10px] text-stone-500 mt-0.5">
-                                + {item.addons.map((a) => a.addon_name).join(", ")}
-                              </div>
-                            )}
-
-                            {item.special_instructions && (
-                              <div className="text-[10px] text-amber-900 italic mt-0.5">
-                                Note: {item.special_instructions}
-                              </div>
-                            )}
-
-                            <div className="text-[11px] font-semibold text-stone-500 mt-0.5">
-                              ₱{Number(item.unit_price).toFixed(2)} each
-                            </div>
-                          </div>
-
-                          {/* QUANTITY CONTROLS & LINE TOTAL */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="flex items-center rounded-xl border border-stone-200 bg-stone-50 p-0.5">
-                              <button
-                                type="button"
-                                onClick={() => updatePendingItemQuantity(item.cart_id, -1)}
-                                className="flex h-6 w-6 items-center justify-center rounded-lg bg-white font-black text-stone-700 hover:bg-stone-200 shadow-2xs transition"
-                                title="Decrease quantity"
-                              >
-                                -
-                              </button>
-                              <span className="w-6 text-center text-xs font-black text-stone-900">
-                                {item.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => updatePendingItemQuantity(item.cart_id, 1)}
-                                className="flex h-6 w-6 items-center justify-center rounded-lg bg-white font-black text-stone-700 hover:bg-stone-200 shadow-2xs transition"
-                                title="Increase quantity"
-                              >
-                                +
-                              </button>
-                            </div>
-
-                            <span className="w-16 text-right font-black text-stone-900">
-                              ₱{(item.unit_price * item.quantity).toFixed(2)}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => removePendingItem(item.cart_id)}
-                              className="p-1 text-stone-400 hover:text-rose-600 transition"
-                              title="Remove item"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* FINANCIAL TOTALS */}
-                  <div className="space-y-1 text-xs border-b border-stone-100 pb-3">
-                    <div className="flex justify-between text-stone-600">
-                      <span>Subtotal</span>
-                      <span>₱{pendingSubtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-stone-600">
-                      <span>Tax (8%)</span>
-                      <span>₱{pendingTax.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-base font-black text-stone-950 pt-1">
-                      <span>Total Due</span>
-                      <span className="text-amber-950">₱{pendingTotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-
-                  {/* CASH & CHANGE TENDER COMPONENT */}
-                  <form onSubmit={handleConfirmCounterPayment} className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCounterPaymentMethod("cash")}
-                        className={`flex-1 py-2 text-xs font-bold rounded-xl border transition ${
-                          counterPaymentMethod === "cash"
-                            ? "border-amber-900 bg-amber-50 text-amber-950"
-                            : "border-stone-200 bg-white text-stone-700"
-                        }`}
-                      >
-                        💵 Cash
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCounterPaymentMethod("card")}
-                        className={`flex-1 py-2 text-xs font-bold rounded-xl border transition ${
-                          counterPaymentMethod === "card"
-                            ? "border-amber-900 bg-amber-50 text-amber-950"
-                            : "border-stone-200 bg-white text-stone-700"
-                        }`}
-                      >
-                        💳 Card
-                      </button>
-                    </div>
-
-                    {counterPaymentMethod === "cash" && (
-                      <div className="rounded-2xl bg-stone-50 p-3 space-y-2 border border-stone-200">
-                        <div className="flex items-center justify-between text-xs">
-                          <label className="font-bold text-stone-700">Amount Tendered (₱):</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min={pendingTotal}
-                            required
-                            value={counterAmountTendered}
-                            onChange={(e) => setCounterAmountTendered(e.target.value)}
-                            placeholder={pendingTotal.toFixed(2)}
-                            className="w-28 rounded-xl border border-stone-300 bg-white p-1.5 text-right text-xs font-black text-stone-900"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-1.5 justify-end">
-                          <button
-                            type="button"
-                            onClick={() => setCounterAmountTendered(pendingTotal.toFixed(2))}
-                            className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                          >
-                            Exact
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCounterAmountTendered("100.00")}
-                            className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                          >
-                            ₱100
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCounterAmountTendered("500.00")}
-                            className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                          >
-                            ₱500
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCounterAmountTendered("1000.00")}
-                            className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                          >
-                            ₱1,000
-                          </button>
-                        </div>
-
-                        <div className="flex justify-between items-center text-xs font-black text-emerald-800 border-t border-stone-200 pt-2">
-                          <span>Change Due:</span>
-                          <span className="text-sm">₱{counterChangeDue.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={
-                        isSubmitting ||
-                        pendingItems.length === 0 ||
-                        (counterPaymentMethod === "cash" && counterNumericTendered < pendingTotal)
-                      }
-                      className="w-full rounded-2xl bg-amber-900 py-3.5 text-xs font-black text-white shadow-md hover:bg-amber-950 disabled:opacity-50 transition"
-                    >
-                      {isSubmitting ? "Processing..." : `Charge ₱${pendingTotal.toFixed(2)} & Dispatch to Barista 🚀`}
-                    </button>
-                  </form>
-                </div>
-              ) : (
-                <div className="rounded-3xl border border-dashed border-stone-200 bg-stone-50/50 p-12 text-center text-xs text-stone-400">
-                  Select a pending counter order on the left to review items, edit quantities, and collect payment.
-                </div>
+            <button
+              type="button"
+              onClick={() => setActiveMode("lookup")}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                activeMode === "lookup"
+                  ? "bg-amber-800 text-white shadow-xs"
+                  : "text-stone-600 hover:text-stone-900"
+              }`}
+            >
+              <span>Pending Orders</span>
+              {lookupResults.length > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-200 px-1 text-[10px] font-black text-amber-950">
+                  {lookupResults.length}
+                </span>
               )}
+            </button>
+          </div>
+
+          {/* Cashier Profile Pill (matching Albert Flores pill in reference image) */}
+          <div className="hidden sm:flex items-center gap-2.5 rounded-full border border-stone-200/80 bg-white px-3 py-1.5 shadow-2xs">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-900 text-xs font-black text-white">
+              {staffName.charAt(0).toUpperCase()}
+            </div>
+            <div className="text-left pr-1 leading-tight">
+              <p className="text-xs font-bold text-stone-900 truncate max-w-[120px]">
+                {staffName}
+              </p>
+              <p className="text-[10px] text-stone-400 truncate max-w-[120px]">
+                {staffEmail}
+              </p>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* ========================================================================= */}
-      {/* MODE 2: NEW COUNTER SALE                                                  */}
+      {/* MODE 1: NEW SALE (REGISTER)                                               */}
       {/* ========================================================================= */}
       {activeMode === "register" && (
-        <div className="space-y-4 animate-in fade-in duration-150">
-          {/* EDITING PENDING ORDER BANNER */}
+        <div className="space-y-5 animate-in fade-in duration-150">
+          {/* EDITING PENDING ORDER BANNER (IF LOADED FOR EDIT) */}
           {editingPendingOrder && (
-            <div className="rounded-3xl border-2 border-amber-500 bg-amber-50 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+            <div className="rounded-3xl border border-amber-300 bg-amber-50/70 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-200 text-xl font-black text-amber-950">
-                  ✏️
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-200/80 text-amber-950">
+                  ☕
                 </span>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-lg bg-amber-900 px-2.5 py-0.5 text-xs font-black text-white">
+                    <span className="rounded-md bg-amber-900 px-2 py-0.5 text-xs font-bold text-white">
                       {editingPendingOrder.reference_code || `REF-${editingPendingOrder.order_id}`}
                     </span>
-                    <span className="text-sm font-black text-stone-900">
+                    <span className="text-sm font-bold text-stone-900">
                       Modifying Order: {editingPendingOrder.customer_name}
                     </span>
                   </div>
                   <p className="text-xs text-amber-900 mt-0.5">
-                    Modify drinks, sizes, modifiers, or quantities below. Totals recalculate live. When finished, collect payment to dispatch order straight to the Barista!
+                    Adjust items or quantities below. Changes recalculate live.
                   </p>
                 </div>
               </div>
@@ -1020,372 +902,702 @@ export default function PosPage() {
                   setCustomerName("Walk-in Guest");
                   setCustomerEmail("");
                 }}
-                className="rounded-xl border border-amber-400 bg-white px-3.5 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100 transition shadow-xs shrink-0"
+                className="rounded-full border border-amber-400 bg-white px-4 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100 transition shadow-xs shrink-0"
               >
                 ✕ Cancel Editing
               </button>
             </div>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-12">
-          {/* LEFT 7 COLS: MENU CATALOG */}
-          <section className="lg:col-span-7 space-y-4">
-            <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-xs space-y-3">
-              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
-                  <label htmlFor="pos-category-select" className="text-xs font-bold text-stone-600 shrink-0">
-                    Category:
-                  </label>
-                  <select
-                    id="pos-category-select"
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="rounded-xl border border-stone-300 bg-stone-50 px-3 py-1.5 text-xs font-bold text-stone-900 focus:border-amber-700 focus:outline-none"
-                  >
-                    <option value="all">All Items ({allItems.length})</option>
-                    {catalog.map((c) => (
-                      <option key={c.category_id} value={c.category_name}>
-                        {c.category_name} ({c.items.length})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="relative min-w-[200px]">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search drinks..."
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 py-1.5 pl-8 pr-3 text-xs font-semibold focus:border-amber-700 focus:bg-white focus:outline-none"
-                  />
-                  <span className="absolute left-2.5 top-2 text-xs text-stone-400">🔍</span>
-                </div>
-              </div>
-            </div>
-
-            {/* CATALOG GRID */}
-            {isLoadingMenu ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <div key={n} className="animate-pulse rounded-2xl border border-stone-200 bg-white p-4 space-y-2">
-                    <div className="aspect-video w-full rounded-xl bg-stone-200" />
-                    <div className="h-4 w-3/4 rounded bg-stone-200" />
-                    <div className="h-3 w-1/2 rounded bg-stone-100" />
-                  </div>
-                ))}
-              </div>
-            ) : menuError ? (
-              <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-8 text-center">
-                <span className="text-3xl">⚠️</span>
-                <p className="mt-2 text-xs font-bold text-rose-800">{menuError}</p>
+          {/* MAIN 2-COLUMN LAYOUT: MENU CATALOG (LEFT) & CART DRAWER (RIGHT) */}
+          <div className="grid gap-6 lg:grid-cols-12 items-start">
+            {/* LEFT 7 OR 8 COLS: HORIZONTAL CATEGORIES & CARDS GRID */}
+            <section className="lg:col-span-7 xl:col-span-8 space-y-5">
+              {/* CATEGORY PILL SELECTOR (MATCHING REFERENCE IMAGE) */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                 <button
-                  onClick={loadMenu}
                   type="button"
-                  className="mt-3 rounded-xl bg-amber-900 px-4 py-2 text-xs font-bold text-white shadow-xs"
+                  onClick={() => setSelectedCategory("all")}
+                  className={`rounded-full px-5 py-2 text-xs font-bold transition shadow-xs whitespace-nowrap ${
+                    selectedCategory === "all"
+                      ? "bg-amber-800 text-white"
+                      : "border border-stone-200/90 bg-white text-stone-600 hover:bg-stone-50"
+                  }`}
                 >
-                  Retry
+                  All Items ({allItems.length})
                 </button>
-              </div>
-            ) : filteredItems.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {filteredItems.map((item) => (
-                  <button
-                    key={item.menu_item_id}
-                    onClick={() => handleSelectDrink(item)}
-                    type="button"
-                    disabled={!item.is_available}
-                    className={`group flex flex-col justify-between overflow-hidden rounded-2xl border bg-white p-3.5 text-left shadow-xs transition hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md ${
-                      !item.is_available ? "opacity-50 grayscale cursor-not-allowed" : "border-stone-200"
-                    }`}
-                  >
-                    <div>
-                      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-stone-100 border border-stone-100 mb-2.5">
-                        {item.image_url ? (
-                          <img
-                            src={getImageUrl(item.image_url)}
-                            alt={item.item_name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xl text-stone-400">
-                            ☕
-                          </div>
-                        )}
-                      </div>
 
-                      <span className="rounded bg-amber-100 px-1.5 py-0.2 text-[9px] font-extrabold uppercase text-amber-900">
-                        {item.category_name}
-                      </span>
-                      <h4 className="mt-1 font-bold text-stone-900 text-xs sm:text-sm line-clamp-1 group-hover:text-amber-950">
-                        {item.item_name}
-                      </h4>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-2 text-xs">
-                      <span className="font-extrabold text-amber-950">
-                        ₱{Number(item.base_price).toFixed(2)}
-                      </span>
-                      <span className="rounded-lg bg-amber-900 text-white px-2 py-0.5 text-[10px] font-bold">
-                        + Add
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-3xl border border-stone-200 bg-white p-12 text-center text-xs text-stone-500">
-                No products found matching &ldquo;{searchQuery}&rdquo;.
-              </div>
-            )}
-          </section>
-
-          {/* RIGHT 5 COLS: REGISTER ORDER TICKET */}
-          <section className="lg:col-span-5">
-            <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-xs space-y-4 sticky top-6">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                <div>
-                  <h3 className="text-base font-extrabold text-stone-900">
-                    {editingPendingOrder ? `Pending Order #${editingPendingOrder.order_id}` : "Register Ticket"} ({cart.reduce((a, c) => a + c.quantity, 0)} items)
-                  </h3>
-                  {editingPendingOrder && (
-                    <span className="text-[11px] font-bold text-amber-800 block mt-0.5">
-                      Editing for {editingPendingOrder.customer_name} ({editingPendingOrder.reference_code})
-                    </span>
-                  )}
-                </div>
-                {cart.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setCart([])}
-                    className="text-xs font-bold text-rose-700 hover:underline"
-                  >
-                    Clear Ticket
-                  </button>
-                )}
+                {catalog.map((cat) => {
+                  const isSelected = selectedCategory.toLowerCase() === cat.category_name.toLowerCase();
+                  return (
+                    <button
+                      key={cat.category_id}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat.category_name)}
+                      className={`rounded-full px-5 py-2 text-xs font-bold transition shadow-xs whitespace-nowrap ${
+                        isSelected
+                          ? "bg-amber-800 text-white"
+                          : "border border-stone-200/90 bg-white text-stone-600 hover:bg-stone-50"
+                      }`}
+                    >
+                      {cat.category_name}
+                    </button>
+                  );
+                })}
               </div>
 
-              {posError && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-800">
-                  {posError}
-                </div>
-              )}
-
-              {/* CUSTOMER NAME, EMAIL & TYPE */}
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <label className="block text-[11px] font-bold text-stone-700">Customer Name</label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-300 p-2 text-xs font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-stone-700">Order Type</label>
-                  <select
-                    value={orderType}
-                    onChange={(e) => setOrderType(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-300 p-2 text-xs font-semibold"
-                  >
-                    <option value="dine_in">Dine-In 🍽️</option>
-                    <option value="takeout">Takeout 🛍️</option>
-                  </select>
-                </div>
+              {/* SECTION HEADER (E.G. "Coffee menu") */}
+              <div className="flex items-baseline justify-between pt-1">
+                <h2 className="text-xl font-bold tracking-tight text-stone-900">
+                  {selectedCategory === "all" ? "All Items" : `${selectedCategory} menu`}
+                </h2>
+                <span className="text-xs font-semibold text-stone-400">
+                  {filteredItems.length} {filteredItems.length === 1 ? "drink" : "drinks"} available
+                </span>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-stone-700">Optional Receipt Email</label>
-                <input
-                  type="email"
-                  value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="guest@example.com (optional)"
-                  className="mt-1 w-full rounded-xl border border-stone-300 p-2 text-xs font-medium"
-                />
-              </div>
-
-              {/* CART TICKET ITEMS */}
-              {cart.length > 0 ? (
-                <div className="max-h-56 overflow-y-auto divide-y divide-stone-100 border-y border-stone-100 my-2">
-                  {cart.map((item) => (
-                    <div key={item.cart_id} className="py-2.5 flex items-start justify-between text-xs">
-                      <div className="space-y-0.5">
-                        <div className="font-bold text-stone-900">
-                          {item.item_name}{" "}
-                          {item.size_name && (
-                            <span className="text-[11px] font-semibold text-stone-500">
-                              ({item.size_name})
-                            </span>
-                          )}
-                        </div>
-                        {item.addons && item.addons.length > 0 && (
-                          <div className="text-[10px] text-stone-500">
-                            + {item.addons.map((a) => a.addon_name).join(", ")}
-                          </div>
-                        )}
-                        {item.special_instructions && (
-                          <div className="text-[10px] text-amber-900 italic">
-                            Note: {item.special_instructions}
-                          </div>
-                        )}
-                        <div className="text-[11px] font-extrabold text-amber-950">
-                          ₱{(item.unit_price * item.quantity).toFixed(2)}
+              {/* PRODUCT CARDS 2-COLUMN GRID (MATCHING REFERENCE IMAGE) */}
+              {isLoadingMenu ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((n) => (
+                    <div key={n} className="animate-pulse rounded-3xl border border-stone-200 bg-white p-5 space-y-3">
+                      <div className="flex gap-4">
+                        <div className="h-32 w-24 rounded-2xl bg-stone-200" />
+                        <div className="flex-1 space-y-2 py-1">
+                          <div className="h-4 w-3/4 rounded bg-stone-200" />
+                          <div className="h-3 w-1/2 rounded bg-stone-100" />
+                          <div className="h-6 w-20 rounded-full bg-stone-100 mt-4" />
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => updateCartQuantity(item.cart_id, -1)}
-                          className="flex h-6 w-6 items-center justify-center rounded-lg bg-stone-100 text-xs font-bold hover:bg-stone-200"
-                        >
-                          -
-                        </button>
-                        <span className="w-5 text-center font-bold">{item.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => updateCartQuantity(item.cart_id, 1)}
-                          className="flex h-6 w-6 items-center justify-center rounded-lg bg-stone-100 text-xs font-bold hover:bg-stone-200"
-                        >
-                          +
-                        </button>
-                      </div>
+                      <div className="h-8 rounded-full bg-stone-100" />
                     </div>
                   ))}
                 </div>
+              ) : menuError ? (
+                <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-8 text-center">
+                  <p className="text-xs font-semibold text-rose-800">{menuError}</p>
+                  <button
+                    onClick={loadMenu}
+                    type="button"
+                    className="mt-3 rounded-full bg-stone-900 px-5 py-2 text-xs font-bold text-white shadow-xs"
+                  >
+                    Retry Loading Catalog
+                  </button>
+                </div>
+              ) : filteredItems.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredItems.map((item) => (
+                    <ProductCard
+                      key={item.menu_item_id}
+                      item={item}
+                      onAddToCart={handleDirectAddToCart}
+                      onOpenCustomizer={handleOpenCustomizer}
+                      isInCart={cart.some((c) => c.menu_item_id === item.menu_item_id)}
+                    />
+                  ))}
+                </div>
               ) : (
-                <div className="py-8 text-center text-xs text-stone-400 border border-dashed border-stone-200 rounded-2xl">
-                  Tap drinks on the left to add to ticket.
+                <div className="rounded-3xl border border-stone-200 bg-white p-12 text-center text-xs text-stone-500">
+                  No drinks found matching &ldquo;{searchQuery}&rdquo;.
                 </div>
               )}
+            </section>
 
-              {/* TOTALS */}
-              <div className="space-y-1 text-xs border-b border-stone-100 pb-3">
-                <div className="flex justify-between text-stone-600">
-                  <span>Subtotal</span>
-                  <span>₱{subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                  <span>Estimated Tax (8%)</span>
-                  <span>₱{tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-base font-black text-stone-950 pt-1">
-                  <span>Total Due</span>
-                  <span>₱{total.toFixed(2)}</span>
-                </div>
-              </div>
+            {/* RIGHT 5 OR 4 COLS: CART DRAWER (MATCHING REFERENCE IMAGE) */}
+            <section className="lg:col-span-5 xl:col-span-4">
+              <div className="sticky top-6 rounded-3xl border border-stone-200/90 bg-white p-6 shadow-xs space-y-4">
+                {/* Cart Header */}
+                <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-black text-stone-900 tracking-tight">Cart</h2>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">
+                      {cart.reduce((a, c) => a + c.quantity, 0)}
+                    </span>
+                  </div>
 
-              {/* PAYMENT METHOD & CASH TENDER */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-stone-400 font-mono">
+                      Order #{orderReferenceNumber}
+                    </span>
+                    {cart.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setCart([])}
+                        className="text-stone-400 hover:text-rose-600 transition p-1"
+                        title="Clear Cart"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {posError && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-800">
+                    {posError}
+                  </div>
+                )}
+
+                {/* ORDER TYPE TOGGLE PILLS (Delivery / Dine in / Take away) */}
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-stone-100/90 rounded-full">
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod("cash")}
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition ${
-                      paymentMethod === "cash"
-                        ? "border-amber-900 bg-amber-50 text-amber-950"
-                        : "border-stone-200 bg-white text-stone-700"
+                    onClick={() => setOrderType("delivery")}
+                    className={`rounded-full py-1.5 text-xs font-bold transition text-center ${
+                      orderType === "delivery"
+                        ? "bg-stone-900 text-white shadow-xs"
+                        : "text-stone-600 hover:text-stone-900"
                     }`}
                   >
-                    💵 Cash
+                    Delivery
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod("card")}
-                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition ${
-                      paymentMethod === "card"
-                        ? "border-amber-900 bg-amber-50 text-amber-950"
-                        : "border-stone-200 bg-white text-stone-700"
+                    onClick={() => setOrderType("dine_in")}
+                    className={`rounded-full py-1.5 text-xs font-bold transition text-center ${
+                      orderType === "dine_in"
+                        ? "bg-stone-900 text-white shadow-xs"
+                        : "text-stone-600 hover:text-stone-900"
                     }`}
                   >
-                    💳 Card
+                    Dine in
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOrderType("takeout")}
+                    className={`rounded-full py-1.5 text-xs font-bold transition text-center ${
+                      orderType === "takeout"
+                        ? "bg-stone-900 text-white shadow-xs"
+                        : "text-stone-600 hover:text-stone-900"
+                    }`}
+                  >
+                    Take away
                   </button>
                 </div>
 
-                {paymentMethod === "cash" && (
-                  <div className="rounded-2xl bg-stone-50 p-3 space-y-2 border border-stone-200 text-xs">
-                    <div className="flex items-center justify-between">
-                      <label className="font-bold text-stone-700">Amount Tendered (₱):</label>
+                {/* Customer Details Inline Fields */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Customer Name"
+                      className="w-full rounded-xl border border-stone-200 bg-stone-50/70 p-2 text-xs font-bold text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="Email (optional)"
+                      className="w-full rounded-xl border border-stone-200 bg-stone-50/70 p-2 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:bg-white focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* CART ITEMS LIST (MATCHING REFERENCE IMAGE) */}
+                {cart.length > 0 ? (
+                  <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 divide-y divide-stone-100">
+                    {cart.map((item) => (
+                      <div key={item.cart_id} className="pt-2 flex items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Item Thumbnail */}
+                          <div className="flex h-12 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-50 border border-stone-100 overflow-hidden">
+                            {item.image_url ? (
+                              <img
+                                src={getImageUrl(item.image_url)}
+                                alt={item.item_name}
+                                className="h-full w-full object-contain p-1"
+                              />
+                            ) : (
+                              <DrinkIllustration className="h-10 w-8" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-stone-900 truncate">
+                              {item.item_name}
+                            </h4>
+                            <p className="text-[11px] text-stone-400 truncate">
+                              {item.size_name || "Standard"}
+                              {item.addons && item.addons.length > 0 ? ` • +${item.addons.length} Addons` : ""}
+                            </p>
+                            <span className="font-bold text-stone-900 text-xs">
+                              ₱{(item.unit_price * item.quantity).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Stepper & Trash */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="inline-flex items-center rounded-full border border-stone-200 bg-stone-50/80 px-2 py-0.5 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateCartQuantity(item.cart_id, -1)}
+                              className="text-stone-500 hover:text-stone-900 font-bold px-0.5"
+                            >
+                              -
+                            </button>
+                            <span className="w-3 text-center text-xs font-black text-stone-900">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateCartQuantity(item.cart_id, 1)}
+                              className="text-stone-500 hover:text-stone-900 font-bold px-0.5"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeCartItem(item.cart_id)}
+                            className="text-stone-300 hover:text-rose-600 transition"
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-stone-200 p-8 text-center text-xs text-stone-400">
+                    Your cart is currently empty.
+                    <br />
+                    Select a drink to add to ticket.
+                  </div>
+                )}
+
+                {/* FINANCIAL TOTALS (MATCHING REFERENCE IMAGE: Items, Discounts, Total) */}
+                <div className="space-y-1.5 border-t border-stone-100 pt-3 text-xs">
+                  <div className="flex justify-between text-stone-400">
+                    <span>Items</span>
+                    <span className="font-medium text-stone-700">₱{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-stone-400">
+                    <span>Tax (8%)</span>
+                    <span className="font-medium text-stone-700">₱{tax.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline pt-1">
+                    <span className="font-semibold text-stone-400">Total</span>
+                    <span className="text-xl font-black text-amber-800">
+                      ₱{total.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* CASH TENDER & CHANGE SECTION */}
+                <div className="space-y-2 border-t border-stone-100 pt-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("cash")}
+                        className={`rounded-full px-3 py-1 font-bold transition ${
+                          paymentMethod === "cash"
+                            ? "bg-stone-900 text-white"
+                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                        }`}
+                      >
+                        Cash
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("card")}
+                        className={`rounded-full px-3 py-1 font-bold transition ${
+                          paymentMethod === "card"
+                            ? "bg-stone-900 text-white"
+                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                        }`}
+                      >
+                        Card
+                      </button>
+                    </div>
+
+                    {paymentMethod === "cash" && (
                       <input
                         type="number"
                         step="0.01"
                         min={total}
                         value={amountTendered}
                         onChange={(e) => setAmountTendered(e.target.value)}
-                        placeholder={total.toFixed(2)}
-                        className="w-28 rounded-xl border border-stone-300 bg-white p-1.5 text-right font-black text-stone-900"
+                        placeholder={`₱${total.toFixed(2)}`}
+                        className="w-24 rounded-full border border-stone-200 bg-stone-50 p-1.5 text-right font-black text-stone-900 focus:bg-white focus:outline-none"
                       />
-                    </div>
-
-                    <div className="flex items-center gap-1 justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setAmountTendered(total.toFixed(2))}
-                        className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                      >
-                        Exact
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAmountTendered("100.00")}
-                        className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                      >
-                        ₱100
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAmountTendered("500.00")}
-                        className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                      >
-                        ₱500
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAmountTendered("1000.00")}
-                        className="rounded-lg bg-stone-200 px-2 py-0.5 text-[10px] font-bold hover:bg-stone-300"
-                      >
-                        ₱1,000
-                      </button>
-                    </div>
-
-                    <div className="flex justify-between items-center font-black text-emerald-800 border-t border-stone-200 pt-1.5">
-                      <span>Change Due:</span>
-                      <span className="text-sm">₱{registerChangeDue.toFixed(2)}</span>
-                    </div>
+                    )}
                   </div>
-                )}
 
+                  {paymentMethod === "cash" && (
+                    <div className="flex items-center justify-between text-[11px] pt-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setAmountTendered(total.toFixed(2))}
+                          className="rounded-full bg-stone-100 px-2 py-0.5 font-bold text-stone-700 hover:bg-stone-200"
+                        >
+                          Exact
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAmountTendered("100.00")}
+                          className="rounded-full bg-stone-100 px-2 py-0.5 font-bold text-stone-700 hover:bg-stone-200"
+                        >
+                          ₱100
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAmountTendered("500.00")}
+                          className="rounded-full bg-stone-100 px-2 py-0.5 font-bold text-stone-700 hover:bg-stone-200"
+                        >
+                          ₱500
+                        </button>
+                      </div>
+
+                      <div className="font-bold text-emerald-800">
+                        Change: ₱{registerChangeDue.toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* BIG ROUNDED ACTION BUTTON (MATCHING "Place an order" BUTTON) */}
                 <button
                   type="button"
                   disabled={cart.length === 0 || isSubmitting || (paymentMethod === "cash" && amountTendered && numericTendered < total)}
                   onClick={handleCheckout}
-                  className="w-full rounded-2xl bg-amber-900 py-3.5 text-xs font-black text-white shadow-md hover:bg-amber-950 disabled:opacity-50 transition"
+                  className="w-full rounded-full bg-amber-800 py-3.5 text-sm font-black text-white shadow-md transition-all hover:bg-amber-900 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99]"
                 >
-                  {isSubmitting
-                    ? "Processing..."
-                    : editingPendingOrder
-                    ? `Charge ₱${total.toFixed(2)} & Dispatch to Barista 🚀`
-                    : `Charge ₱${total.toFixed(2)} & Complete 📄`}
+                  {isSubmitting ? "Processing..." : "Place an order"}
                 </button>
               </div>
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
-      </div>
-    )}
+      )}
 
-      {/* CUSTOMIZE ITEM MODAL */}
+      {/* ========================================================================= */}
+      {/* MODE 2: LOOK UP PENDING COUNTER ORDERS                                    */}
+      {/* ========================================================================= */}
+      {activeMode === "lookup" && (
+        <div className="space-y-6 animate-in fade-in duration-150">
+          <div className="grid gap-6 lg:grid-cols-12 items-start">
+            {/* LEFT 7 COLS: PENDING ORDERS LIST */}
+            <section className="lg:col-span-7 space-y-4">
+              {/* Lookup Search Input */}
+              <div className="rounded-3xl border border-stone-200/90 bg-white p-5 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-stone-900">
+                    Pending Pickup Tickets
+                  </h3>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">
+                    {lookupResults.length} waiting
+                  </span>
+                </div>
+
+                <form onSubmit={handleLookupSearch} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={lookupQuery}
+                    onChange={(e) => setLookupQuery(e.target.value)}
+                    placeholder="Search by REF-XXXX, order #, or customer name..."
+                    className="flex-1 rounded-full border border-stone-200 bg-stone-50 py-2 px-4 text-xs font-semibold focus:bg-white focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearchingLookup}
+                    className="rounded-full bg-stone-900 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-stone-800 transition"
+                  >
+                    {isSearchingLookup ? "Searching..." : "Search"}
+                  </button>
+                </form>
+              </div>
+
+              {lookupError && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-bold text-rose-800">
+                  {lookupError}
+                </div>
+              )}
+
+              {/* Pending Orders Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {lookupResults.map((order) => {
+                  const isSelected = selectedPendingOrder?.order_id === order.order_id;
+                  return (
+                    <button
+                      key={order.order_id}
+                      type="button"
+                      onClick={() => handleSelectPendingOrder(order)}
+                      className={`text-left rounded-3xl p-5 border transition-all duration-200 flex flex-col justify-between ${
+                        isSelected
+                          ? "border-amber-800 bg-amber-50/50 shadow-md ring-2 ring-amber-300"
+                          : "border-stone-200/90 bg-white hover:border-amber-700/40 hover:shadow-xs"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded-full bg-stone-900 px-3 py-1 font-mono text-xs font-bold text-white">
+                            {order.reference_code || `REF-${order.order_id}`}
+                          </span>
+                          <span className="text-xs font-bold text-amber-900">
+                            ₱{Number(order.total_amount).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <h4 className="mt-3 font-bold text-stone-900 text-sm">
+                          {order.customer_name}
+                        </h4>
+                        <p className="text-xs text-stone-400 mt-0.5">
+                          {order.items?.length || 0} drinks • {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
+                        <span className="font-semibold text-stone-500">Status: {order.status}</span>
+                        <span className="font-bold text-amber-800">Select Order →</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {lookupResults.length === 0 && !isSearchingLookup && (
+                <div className="rounded-3xl border border-stone-200 bg-white p-12 text-center text-xs text-stone-400">
+                  No pending counter orders found.
+                </div>
+              )}
+            </section>
+
+            {/* RIGHT 5 COLS: SELECTED ORDER PAYMENT PANEL */}
+            <section className="lg:col-span-5">
+              <div className="sticky top-6 rounded-3xl border border-stone-200/90 bg-white p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                  <div>
+                    <h3 className="text-lg font-black text-stone-900">
+                      {selectedPendingOrder ? `Order #${selectedPendingOrder.order_id}` : "Select an Order"}
+                    </h3>
+                    {selectedPendingOrder && (
+                      <p className="text-xs font-bold text-amber-900">
+                        {selectedPendingOrder.customer_name} ({selectedPendingOrder.reference_code})
+                      </p>
+                    )}
+                  </div>
+                  {selectedPendingOrder && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Load into full register for editing
+                        setEditingPendingOrder(selectedPendingOrder);
+                        setCart(pendingItems);
+                        setCustomerName(selectedPendingOrder.customer_name);
+                        setActiveMode("register");
+                      }}
+                      className="rounded-full bg-amber-100 text-amber-900 px-3 py-1 text-xs font-bold hover:bg-amber-200 transition"
+                    >
+                      Edit in Register
+                    </button>
+                  )}
+                </div>
+
+                {selectedPendingOrder ? (
+                  <>
+                    {/* Add extra drink toggle */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddDrinkDropdown((v) => !v)}
+                        className="w-full rounded-2xl border border-dashed border-amber-800/40 p-2.5 text-xs font-bold text-amber-900 hover:bg-amber-50/60 transition"
+                      >
+                        + Add Another Drink to This Ticket
+                      </button>
+
+                      {showAddDrinkDropdown && (
+                        <div className="absolute left-0 right-0 mt-2 z-20 max-h-56 overflow-y-auto rounded-2xl border border-stone-200 bg-white p-3 shadow-xl space-y-2">
+                          <input
+                            type="text"
+                            value={addDrinkSearch}
+                            onChange={(e) => setAddDrinkSearch(e.target.value)}
+                            placeholder="Type drink name..."
+                            className="w-full rounded-xl border border-stone-200 p-2 text-xs font-semibold focus:outline-none"
+                          />
+                          <div className="divide-y divide-stone-100">
+                            {allItems
+                              .filter((it) => !addDrinkSearch || it.item_name.toLowerCase().includes(addDrinkSearch.toLowerCase()))
+                              .map((it) => (
+                                <button
+                                  key={it.menu_item_id}
+                                  type="button"
+                                  onClick={() => {
+                                    handleDirectAddToCart({ item: it, size: it.sizes?.[0], quantity: 1 });
+                                    setShowAddDrinkDropdown(false);
+                                  }}
+                                  className="w-full py-2 px-1 text-left text-xs font-bold text-stone-900 hover:bg-amber-50 flex justify-between"
+                                >
+                                  <span>{it.item_name}</span>
+                                  <span className="text-amber-800">₱{Number(it.base_price).toFixed(2)}</span>
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pending Order Items List */}
+                    <div className="max-h-56 overflow-y-auto divide-y divide-stone-100 border-y border-stone-100 my-2">
+                      {pendingItems.map((item) => (
+                        <div key={item.cart_id} className="py-2.5 flex items-center justify-between text-xs">
+                          <div className="min-w-0 pr-2">
+                            <h4 className="font-bold text-stone-900 truncate">{item.item_name}</h4>
+                            <p className="text-[11px] text-stone-400">
+                              {item.size_name || "Regular"}
+                              {item.addons?.length > 0 ? ` • +${item.addons.length} Addons` : ""}
+                            </p>
+                            <span className="font-bold text-stone-900">₱{(item.unit_price * item.quantity).toFixed(2)}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="inline-flex items-center rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => updatePendingItemQuantity(item.cart_id, -1)}
+                                className="text-stone-500 hover:text-stone-900 font-bold"
+                              >
+                                -
+                              </button>
+                              <span className="w-3 text-center font-black">{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => updatePendingItemQuantity(item.cart_id, 1)}
+                                className="text-stone-500 hover:text-stone-900 font-bold"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removePendingItem(item.cart_id)}
+                              className="text-stone-300 hover:text-rose-600 transition"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Pending Order Totals */}
+                    <div className="space-y-1.5 text-xs border-b border-stone-100 pb-3">
+                      <div className="flex justify-between text-stone-400">
+                        <span>Items Subtotal</span>
+                        <span>₱{pendingSubtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-stone-400">
+                        <span>Tax (8%)</span>
+                        <span>₱{pendingTax.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-baseline pt-1">
+                        <span className="font-semibold text-stone-400">Total Due</span>
+                        <span className="text-xl font-black text-amber-800">
+                          ₱{pendingTotal.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Payment Options */}
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCounterPaymentMethod("cash")}
+                            className={`rounded-full px-3 py-1 font-bold transition ${
+                              counterPaymentMethod === "cash"
+                                ? "bg-stone-900 text-white"
+                                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                            }`}
+                          >
+                            Cash
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCounterPaymentMethod("card")}
+                            className={`rounded-full px-3 py-1 font-bold transition ${
+                              counterPaymentMethod === "card"
+                                ? "bg-stone-900 text-white"
+                                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                            }`}
+                          >
+                            Card
+                          </button>
+                        </div>
+
+                        {counterPaymentMethod === "cash" && (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={pendingTotal}
+                            value={counterAmountTendered}
+                            onChange={(e) => setCounterAmountTendered(e.target.value)}
+                            placeholder={`₱${pendingTotal.toFixed(2)}`}
+                            className="w-24 rounded-full border border-stone-200 bg-stone-50 p-1.5 text-right font-black text-stone-900 focus:bg-white focus:outline-none"
+                          />
+                        )}
+                      </div>
+
+                      {counterPaymentMethod === "cash" && (
+                        <div className="flex items-center justify-between text-[11px] pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setCounterAmountTendered(pendingTotal.toFixed(2))}
+                            className="rounded-full bg-stone-100 px-2 py-0.5 font-bold text-stone-700 hover:bg-stone-200"
+                          >
+                            Exact
+                          </button>
+                          <div className="font-bold text-emerald-800">
+                            Change: ₱{counterChangeDue.toFixed(2)}
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={isSubmitting || pendingItems.length === 0}
+                        onClick={handleConfirmCounterPayment}
+                        className="w-full rounded-full bg-amber-800 py-3.5 text-sm font-black text-white shadow-md transition-all hover:bg-amber-900 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSubmitting ? "Processing..." : "Confirm Payment & Print Receipt"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-12 text-center text-xs text-stone-400">
+                    Select a pending ticket from the list on the left to review items and tender payment.
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CUSTOMIZE ITEM MODAL                                                      */}
+      {/* ========================================================================= */}
       {customizingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 p-4 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div>
                 <h3 className="text-base font-black text-stone-900">{customizingItem.item_name}</h3>
-                <span className="text-xs text-amber-950 font-bold">
-                  Base: ₱{Number(customizingItem.base_price).toFixed(2)}
+                <span className="text-xs text-amber-800 font-bold">
+                  Base Price: ₱{Number(customizingItem.base_price).toFixed(2)}
                 </span>
               </div>
               <button
@@ -1408,10 +1620,10 @@ export default function PosPage() {
                       key={s.menu_item_size_id}
                       type="button"
                       onClick={() => setSelectedSize(s)}
-                      className={`p-2.5 rounded-xl border text-xs font-bold flex justify-between ${
+                      className={`p-2.5 rounded-2xl border text-xs font-bold flex justify-between transition ${
                         selectedSize?.menu_item_size_id === s.menu_item_size_id
-                          ? "border-amber-900 bg-amber-50 text-amber-950 ring-2 ring-amber-300"
-                          : "border-stone-200 text-stone-700"
+                          ? "border-amber-800 bg-amber-50 text-amber-950 ring-2 ring-amber-300"
+                          : "border-stone-200 text-stone-700 hover:bg-stone-50"
                       }`}
                     >
                       <span>{s.size_name}</span>
@@ -1430,16 +1642,16 @@ export default function PosPage() {
             {customizingItem.addons && customizingItem.addons.length > 0 && (
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-stone-700 block uppercase tracking-wider">
-                  Add-ons & Flavors
+                  Add-ons & Options
                 </label>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                   {customizingItem.addons.map((a) => {
                     const isChecked = selectedAddons.some((x) => x.menu_item_addon_id === a.menu_item_addon_id);
                     return (
                       <label
                         key={a.menu_item_addon_id}
-                        className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-bold cursor-pointer ${
-                          isChecked ? "border-amber-900 bg-amber-50" : "border-stone-200"
+                        className={`flex items-center justify-between p-2.5 rounded-2xl border text-xs font-bold cursor-pointer transition ${
+                          isChecked ? "border-amber-800 bg-amber-50 text-amber-950" : "border-stone-200 text-stone-700"
                         }`}
                       >
                         <div className="flex items-center gap-2">
@@ -1458,7 +1670,7 @@ export default function PosPage() {
                           />
                           <span>{a.addon_name}</span>
                         </div>
-                        <span className="text-amber-900">+₱{Number(a.additional_price).toFixed(2)}</span>
+                        <span className="text-amber-800">+₱{Number(a.additional_price).toFixed(2)}</span>
                       </label>
                     );
                   })}
@@ -1471,10 +1683,10 @@ export default function PosPage() {
               <label className="text-xs font-bold text-stone-700 block">Special Instructions</label>
               <input
                 type="text"
-                placeholder="e.g. Extra hot, oat milk"
+                placeholder="e.g. Extra hot, oat milk, less ice"
                 value={specialInstructions}
                 onChange={(e) => setSpecialInstructions(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-stone-300 p-2 text-xs"
+                className="mt-1 w-full rounded-2xl border border-stone-200 p-2.5 text-xs font-semibold focus:outline-none focus:border-amber-800"
               />
             </div>
 
@@ -1482,14 +1694,14 @@ export default function PosPage() {
               <button
                 type="button"
                 onClick={() => setCustomizingItem(null)}
-                className="rounded-xl border border-stone-300 px-4 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100"
+                className="rounded-full border border-stone-300 px-5 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleAddCustomizedToCart}
-                className="rounded-xl bg-amber-900 px-5 py-2 text-xs font-black text-white hover:bg-amber-800 shadow-md"
+                className="rounded-full bg-amber-800 px-6 py-2 text-xs font-black text-white hover:bg-amber-900 shadow-md"
               >
                 Add to Ticket
               </button>
@@ -1498,80 +1710,152 @@ export default function PosPage() {
         </div>
       )}
 
-      {/* POS & COUNTER RECEIPT CONFIRMATION DIALOG */}
+      {/* ========================================================================= */}
+      {/* POS RECEIPT CONFIRMATION DIALOG                                           */}
+      {/* ========================================================================= */}
       {confirmedReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 p-4 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-3xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-emerald-100 text-3xl mx-auto">
-              ✓
-            </div>
-
-            <div>
-              <h3 className="text-xl font-black text-stone-900">Payment Confirmed!</h3>
-              <p className="text-xs text-stone-500">
-                Order #{confirmedReceipt.order_id} sent to Barista Queue.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-              <span className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider block">
-                Single-Use Pickup Code
-              </span>
-              <span className="text-3xl font-black tracking-widest text-amber-950 block mt-1">
-                {confirmedReceipt.pickup_code}
-              </span>
-            </div>
-
-            <div className="rounded-2xl border border-stone-100 bg-stone-50 p-3.5 text-xs space-y-1.5 text-left">
-              <div className="flex justify-between text-stone-600">
-                <span>Customer:</span>
-                <span className="font-bold text-stone-900">{confirmedReceipt.customer_name}</span>
-              </div>
-              <div className="flex justify-between text-stone-600">
-                <span>Total Paid:</span>
-                <span className="font-extrabold text-stone-900">₱{Number(confirmedReceipt.total_amount).toFixed(2)}</span>
-              </div>
-              {confirmedReceipt.amount_tendered && (
-                <div className="flex justify-between text-stone-600">
-                  <span>Cash Tendered:</span>
-                  <span>₱{Number(confirmedReceipt.amount_tendered).toFixed(2)}</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/75 p-3 sm:p-5 md:p-6 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg md:max-w-4xl max-h-[92vh] flex flex-col rounded-3xl border border-stone-200 bg-white shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-stone-200 bg-stone-50/80 px-6 py-3.5 sm:py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-xl text-emerald-800 shadow-xs">
+                  ✓
                 </div>
-              )}
-              {confirmedReceipt.change_due !== null && confirmedReceipt.change_due !== undefined && (
-                <div className="flex justify-between font-black text-emerald-800 border-t border-stone-200 pt-1">
-                  <span>Change Given:</span>
-                  <span>₱{Number(confirmedReceipt.change_due).toFixed(2)}</span>
+                <div>
+                  <h3 className="text-base font-black text-stone-900">Payment Confirmed!</h3>
+                  <p className="text-xs text-stone-500">
+                    Order #{confirmedReceipt.order_id} sent to Barista Queue.
+                  </p>
                 </div>
-              )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setConfirmedReceipt(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl text-stone-400 hover:bg-stone-200 hover:text-stone-700 transition"
+                title="Close"
+              >
+                ✕
+              </button>
             </div>
 
-            {/* PRINT & DOWNLOAD RECEIPT PDF BUTTONS */}
-            {confirmedReceipt.receipt_pdf_url && (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => printReceipt(confirmedReceipt.receipt_pdf_url)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-stone-50 py-2.5 text-xs font-bold text-stone-800 hover:bg-stone-100 transition"
-                >
-                  <span>🖨️ Print Receipt</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => downloadReceipt(confirmedReceipt.receipt_pdf_url, confirmedReceipt.order_id)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition"
-                >
-                  <span>⬇️ Download PDF</span>
-                </button>
-              </div>
-            )}
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                {/* Left Column: Transaction Details & Actions */}
+                <div className="md:col-span-6 lg:col-span-5 space-y-4">
+                  {/* Single-Use Pickup Code Box */}
+                  <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-b from-amber-50 to-amber-100/50 p-4 text-center shadow-xs">
+                    <span className="text-[10px] font-extrabold uppercase text-amber-800 tracking-wider block">
+                      Single-Use Pickup Code
+                    </span>
+                    <span className="text-3xl sm:text-4xl font-black tracking-widest text-amber-950 block mt-0.5 font-mono">
+                      {confirmedReceipt.pickup_code}
+                    </span>
+                  </div>
 
-            <button
-              type="button"
-              onClick={() => setConfirmedReceipt(null)}
-              className="w-full rounded-2xl bg-amber-900 py-3 text-xs font-black text-white shadow-md hover:bg-amber-800 transition"
-            >
-              Next Customer / New Sale
-            </button>
+                  {/* Financial Breakdown Card */}
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4 text-xs space-y-2">
+                    <div className="flex justify-between text-stone-600">
+                      <span>Customer:</span>
+                      <span className="font-bold text-stone-900 truncate max-w-[180px]">
+                        {confirmedReceipt.customer_name || "Walk-in Guest"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-stone-600">
+                      <span>Cashier:</span>
+                      <span className="font-medium text-stone-800">{staffName}</span>
+                    </div>
+                    <div className="flex justify-between text-stone-600">
+                      <span>Order Type:</span>
+                      <span className="font-bold text-stone-900 uppercase text-[11px]">
+                        {(confirmedReceipt.order_channel || "in_store").replace("_", " ")} • {(confirmedReceipt.order_type || "dine_in").replace("_", " ")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-stone-600 border-t border-stone-200/70 pt-2">
+                      <span>Total Paid:</span>
+                      <span className="font-extrabold text-stone-900 text-sm">
+                        ₱{Number(confirmedReceipt.total_amount).toFixed(2)}
+                      </span>
+                    </div>
+                    {confirmedReceipt.amount_tendered && (
+                      <div className="flex justify-between text-stone-600">
+                        <span>Cash Tendered:</span>
+                        <span className="font-mono font-medium">
+                          ₱{Number(confirmedReceipt.amount_tendered).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {confirmedReceipt.change_due !== null && confirmedReceipt.change_due !== undefined && (
+                      <div className="flex justify-between items-center font-black text-emerald-800 border-t border-stone-200/70 pt-2">
+                        <span className="text-xs">Change Given:</span>
+                        <span className="font-mono text-base font-black text-emerald-900">
+                          ₱{Number(confirmedReceipt.change_due).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Printing Controls & Next Sale Action */}
+                  <div className="space-y-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={printThermalReceipt}
+                      className="w-full flex items-center justify-center gap-2 rounded-full bg-stone-900 py-3 text-xs font-bold text-white shadow-xs hover:bg-black transition"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>Print Thermal Receipt</span>
+                    </button>
+
+                    {confirmedReceipt.receipt_pdf_url && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => printReceipt(confirmedReceipt.receipt_pdf_url)}
+                          className="flex items-center justify-center gap-1.5 rounded-full border border-stone-300 bg-white py-2 text-xs font-bold text-stone-800 hover:bg-stone-50 transition"
+                        >
+                          Print PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => downloadReceipt(confirmedReceipt.receipt_pdf_url, confirmedReceipt.order_id)}
+                          className="flex items-center justify-center gap-1.5 rounded-full border border-stone-300 bg-white py-2 text-xs font-bold text-stone-800 hover:bg-stone-100 transition"
+                        >
+                          Download PDF
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setConfirmedReceipt(null)}
+                      className="w-full rounded-full border border-stone-300 bg-white py-3 text-xs font-bold text-stone-700 hover:bg-stone-100 transition shadow-2xs"
+                    >
+                      Next Customer / New Sale
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right Column: Thermal Receipt Preview */}
+                <div className="md:col-span-6 lg:col-span-7 flex flex-col space-y-2.5">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-stone-800">
+                      Official Thermal Receipt
+                    </span>
+                    <span className="rounded-full bg-stone-200/80 px-2.5 py-0.5 text-[10px] font-bold text-stone-600 font-mono">
+                      80mm Standard Roll
+                    </span>
+                  </div>
+
+                  <div className="rounded-2xl border border-stone-200 bg-stone-100/80 p-3 sm:p-5 max-h-[500px] overflow-y-auto shadow-inner flex justify-center">
+                    <ThermalReceipt order={confirmedReceipt} staffName={staffName} />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

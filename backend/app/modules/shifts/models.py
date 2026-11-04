@@ -2,7 +2,8 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
-from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum, ForeignKey, Numeric, String, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
