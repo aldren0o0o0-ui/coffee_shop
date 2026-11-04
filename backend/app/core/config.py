@@ -31,6 +31,19 @@ class Settings(BaseSettings):
     smtp_tls: bool = True
     smtp_ssl: bool = False
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: object) -> object:
+        """Automatically adjust postgres connection schemes for psycopg 3 driver."""
+        if isinstance(value, str):
+            normalized = value.strip()
+            if normalized.startswith("postgres://"):
+                normalized = normalized.replace("postgres://", "postgresql+psycopg://", 1)
+            elif normalized.startswith("postgresql://") and not normalized.startswith("postgresql+"):
+                normalized = normalized.replace("postgresql://", "postgresql+psycopg://", 1)
+            return normalized
+        return value
+
     @field_validator("debug", mode="before")
     @classmethod
     def parse_debug(cls, value: object) -> object:
