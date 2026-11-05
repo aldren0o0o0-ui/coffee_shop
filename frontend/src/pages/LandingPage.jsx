@@ -192,23 +192,7 @@ export default function LandingPage() {
         {/* Nav Action Buttons */}
         <div className="flex items-center gap-3">
           {/* Audio Toggle Button */}
-          <button
-            onClick={toggleAudio}
-            type="button"
-            title="Play / Pause Cafe Background Music"
-            className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${isPlaying
-              ? "border-[#c8860a] bg-[#c8860a]/20 text-[#e6a832] shadow-[0_0_15px_rgba(200,134,10,0.3)] is-playing"
-              : "border-[#c8860a]/30 bg-[#2a1c0d]/80 text-[#b8a08a] hover:border-[#c8860a] hover:text-[#f5e6d3]"
-              }`}
-          >
-            <span className="eq-bars">
-              <span className="eq-bar" />
-              <span className="eq-bar" />
-              <span className="eq-bar" />
-              <span className="eq-bar" />
-            </span>
-            <span className="hidden sm:inline">{isPlaying ? "Music: ON 🎵" : "Music: OFF"}</span>
-          </button>
+
 
           {/* Direct Browse Catalog Link */}
           <Link
