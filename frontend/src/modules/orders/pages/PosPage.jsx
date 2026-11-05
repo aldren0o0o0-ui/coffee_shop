@@ -1033,7 +1033,7 @@ export default function PosPage() {
                 )}
 
                 {/* ORDER TYPE TOGGLE PILLS (Delivery / Dine in / Take away) */}
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-stone-100/90 rounded-full">
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-100/90 rounded-full">
 
 
                   <button
