@@ -151,11 +151,10 @@ export default function LandingPage() {
 
       {/* NAVIGATION BAR */}
       <nav
-        className={`sticky top-0 z-50 flex items-center justify-between px-6 transition-all duration-300 sm:px-12 ${
-          isScrolled
+        className={`sticky top-0 z-50 flex items-center justify-between px-6 transition-all duration-300 sm:px-12 ${isScrolled
             ? "h-16 border-b border-[#c8860a]/20 bg-[#140e08]/92 shadow-2xl backdrop-blur-md"
             : "h-20 bg-transparent"
-        }`}
+          }`}
       >
         <Link to="/" className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#c8860a]/40 bg-[#2a1c0d] text-xl text-[#e6a832] shadow-sm">
@@ -197,11 +196,10 @@ export default function LandingPage() {
             onClick={toggleAudio}
             type="button"
             title="Play / Pause Cafe Background Music"
-            className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
-              isPlaying
+            className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${isPlaying
                 ? "border-[#c8860a] bg-[#c8860a]/20 text-[#e6a832] shadow-[0_0_15px_rgba(200,134,10,0.3)] is-playing"
                 : "border-[#c8860a]/30 bg-[#2a1c0d]/80 text-[#b8a08a] hover:border-[#c8860a] hover:text-[#f5e6d3]"
-            }`}
+              }`}
           >
             <span className="eq-bars">
               <span className="eq-bar" />
@@ -251,7 +249,7 @@ export default function LandingPage() {
       <section className="relative overflow-hidden px-6 pt-16 pb-24 sm:px-12 sm:pt-24 sm:pb-32">
         {/* Subtle background glow */}
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_60%_70%_at_70%_50%,rgba(200,134,10,0.12)_0%,transparent_70%)]" />
-        
+
         <div className="mx-auto flex max-w-6xl flex-col-reverse items-center justify-between gap-12 lg:flex-row lg:gap-16">
           {/* Hero Left Content */}
           <div className="max-w-xl text-center lg:text-left animate-fade-up">
@@ -280,12 +278,6 @@ export default function LandingPage() {
               >
                 Order Online
               </Link>
-              <a
-                href="#reviews"
-                className="flex items-center gap-1.5 text-xs font-bold text-[#e6a832] underline hover:text-[#f4c265] py-2 px-1 transition"
-              >
-                <span>⭐ 4.9 Customer Reviews</span>
-              </a>
             </div>
           </div>
 
@@ -648,10 +640,10 @@ export default function LandingPage() {
                         {reviewRating === 5
                           ? "5.0 — Exceptional! ☕"
                           : reviewRating === 4
-                          ? "4.0 — Great Experience"
-                          : reviewRating === 3
-                          ? "3.0 — Average"
-                          : `${reviewRating}.0 — Needs Improvement`}
+                            ? "4.0 — Great Experience"
+                            : reviewRating === 3
+                              ? "3.0 — Average"
+                              : `${reviewRating}.0 — Needs Improvement`}
                       </span>
                     </div>
                   </div>
@@ -848,14 +840,12 @@ export default function LandingPage() {
 
       {/* FLOATING MINI AUDIO PLAYER CONTROLLER */}
       <div
-        className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full border border-[#c8860a] bg-[#1a1108]/95 px-4 py-2 shadow-[0_10px_35px_rgba(0,0,0,0.7),0_0_20px_rgba(200,134,10,0.25)] backdrop-blur-md transition ${
-          isPlaying ? "is-playing" : ""
-        }`}
+        className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full border border-[#c8860a] bg-[#1a1108]/95 px-4 py-2 shadow-[0_10px_35px_rgba(0,0,0,0.7),0_0_20px_rgba(200,134,10,0.25)] backdrop-blur-md transition ${isPlaying ? "is-playing" : ""
+          }`}
       >
         <div
-          className={`flex h-8 w-8 items-center justify-center rounded-full bg-[radial-gradient(circle,#c8860a_0%,#160e07_70%)] text-xs text-[#140e08] shadow-sm ${
-            isPlaying ? "animate-vinyl" : ""
-          }`}
+          className={`flex h-8 w-8 items-center justify-center rounded-full bg-[radial-gradient(circle,#c8860a_0%,#160e07_70%)] text-xs text-[#140e08] shadow-sm ${isPlaying ? "animate-vinyl" : ""
+            }`}
         >
           ☕
         </div>
