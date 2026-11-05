@@ -137,7 +137,7 @@ export default function LandingPage() {
       <div className="border-b border-[#c8860a]/20 bg-[#1e1509] px-4 py-2 text-center text-xs font-semibold text-[#e6a832]">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <span className="truncate">
-            ☕ Welcome to LDRN&apos;s Coffee — Freshly Roasted Beans &amp; Handcrafted Brews in Cebu City
+            ☕ Welcome to LDRN&apos;s Coffee — Freshly Roasted Beans &amp; Handcrafted Brews in Clarin, Bohol
           </span>
           <div className="hidden sm:flex items-center gap-4 text-[11px] text-[#b8a08a]">
             <span>Daily: 5:00 AM – 10:00 PM</span>
@@ -152,8 +152,8 @@ export default function LandingPage() {
       {/* NAVIGATION BAR */}
       <nav
         className={`sticky top-0 z-50 flex items-center justify-between px-6 transition-all duration-300 sm:px-12 ${isScrolled
-            ? "h-16 border-b border-[#c8860a]/20 bg-[#140e08]/92 shadow-2xl backdrop-blur-md"
-            : "h-20 bg-transparent"
+          ? "h-16 border-b border-[#c8860a]/20 bg-[#140e08]/92 shadow-2xl backdrop-blur-md"
+          : "h-20 bg-transparent"
           }`}
       >
         <Link to="/" className="flex items-center gap-3">
@@ -197,8 +197,8 @@ export default function LandingPage() {
             type="button"
             title="Play / Pause Cafe Background Music"
             className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${isPlaying
-                ? "border-[#c8860a] bg-[#c8860a]/20 text-[#e6a832] shadow-[0_0_15px_rgba(200,134,10,0.3)] is-playing"
-                : "border-[#c8860a]/30 bg-[#2a1c0d]/80 text-[#b8a08a] hover:border-[#c8860a] hover:text-[#f5e6d3]"
+              ? "border-[#c8860a] bg-[#c8860a]/20 text-[#e6a832] shadow-[0_0_15px_rgba(200,134,10,0.3)] is-playing"
+              : "border-[#c8860a]/30 bg-[#2a1c0d]/80 text-[#b8a08a] hover:border-[#c8860a] hover:text-[#f5e6d3]"
               }`}
           >
             <span className="eq-bars">
