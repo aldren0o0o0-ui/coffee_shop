@@ -24,7 +24,7 @@ export default function OwnerDashboard() {
     try {
       setError("");
       const [overview, alertsData, reports] = await Promise.all([
-        fetchDashboardOverview(branchParam),
+        fetchDashboardOverview(branchParam, "owner"),
         fetchAlerts(branchParam, false).catch(() => []),
         fetchStoreReports(reportPeriod).catch(() => null),
       ]);
@@ -41,7 +41,11 @@ export default function OwnerDashboard() {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 20000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadData();
+      }
+    }, 60000);
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -277,9 +281,13 @@ export default function OwnerDashboard() {
                 {kpi.icon}
               </div>
             </div>
-            <p className="mt-2 text-xl font-extrabold tracking-tight text-stone-900">
-              {isLoading ? "…" : kpi.value}
-            </p>
+            <div className="mt-2 text-xl font-extrabold tracking-tight text-stone-900">
+              {isLoading && !stats ? (
+                <span className="inline-block h-6 w-20 animate-pulse rounded bg-stone-200" />
+              ) : (
+                kpi.value
+              )}
+            </div>
             <p className={`mt-1 text-[11px] font-medium ${kpi.isPositive ? "text-emerald-700" : "text-rose-600"}`}>
               {kpi.change}
             </p>

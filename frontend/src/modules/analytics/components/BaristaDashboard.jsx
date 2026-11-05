@@ -13,7 +13,6 @@ export default function BaristaDashboard({ onOpenPasswordModal }) {
 
   const loadQueue = useCallback(async () => {
     try {
-      setIsLoading(true);
       const data = await fetchBaristaQueue();
       setQueueData(data);
     } catch (err) {
@@ -25,7 +24,11 @@ export default function BaristaDashboard({ onOpenPasswordModal }) {
 
   useEffect(() => {
     loadQueue();
-    const interval = setInterval(loadQueue, 10000); // 10s auto-refresh for kitchen queue
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadQueue();
+      }
+    }, 15000); // 15s auto-refresh for kitchen queue when tab is active
     return () => clearInterval(interval);
   }, [loadQueue]);
 

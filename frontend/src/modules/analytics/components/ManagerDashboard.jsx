@@ -16,9 +16,8 @@ export default function ManagerDashboard({ onOpenPasswordModal }) {
 
   const loadData = useCallback(async () => {
     try {
-      setIsLoading(true);
       const [overview, reports] = await Promise.all([
-        fetchDashboardOverview().catch(() => null),
+        fetchDashboardOverview(null, "manager").catch(() => null),
         fetchStoreReports(reportPeriod).catch(() => null),
       ]);
       if (overview?.manager_stats) {
@@ -34,7 +33,11 @@ export default function ManagerDashboard({ onOpenPasswordModal }) {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 30000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadData();
+      }
+    }, 60000);
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -178,9 +181,13 @@ export default function ManagerDashboard({ onOpenPasswordModal }) {
           <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
             Shift Revenue
           </span>
-          <p className="mt-2 text-2xl font-extrabold text-stone-900">
-            {isLoading ? "…" : `₱${Number(stats?.shift_revenue || 0).toFixed(2)}`}
-          </p>
+          <div className="mt-2 text-2xl font-extrabold text-stone-900">
+            {isLoading && !stats ? (
+              <span className="inline-block h-6 w-24 animate-pulse rounded bg-stone-200" />
+            ) : (
+              `₱${Number(stats?.shift_revenue || 0).toFixed(2)}`
+            )}
+          </div>
           <p className="mt-1 text-xs text-emerald-700 font-medium">Settled tickets today</p>
         </article>
 
@@ -188,9 +195,13 @@ export default function ManagerDashboard({ onOpenPasswordModal }) {
           <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
             Order Pace
           </span>
-          <p className="mt-2 text-2xl font-extrabold text-stone-900">
-            {isLoading ? "…" : `${stats?.orders_per_hour || 0} / hr`}
-          </p>
+          <div className="mt-2 text-2xl font-extrabold text-stone-900">
+            {isLoading && !stats ? (
+              <span className="inline-block h-6 w-16 animate-pulse rounded bg-stone-200" />
+            ) : (
+              `${stats?.orders_per_hour || 0} / hr`
+            )}
+          </div>
           <p className="mt-1 text-xs text-stone-500">Hourly throughput velocity</p>
         </article>
 
@@ -198,9 +209,13 @@ export default function ManagerDashboard({ onOpenPasswordModal }) {
           <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
             Pending Approvals
           </span>
-          <p className="mt-2 text-2xl font-extrabold text-amber-900">
-            {isLoading ? "…" : `${stats?.pending_purchases_count || 0}`}
-          </p>
+          <div className="mt-2 text-2xl font-extrabold text-amber-900">
+            {isLoading && !stats ? (
+              <span className="inline-block h-6 w-12 animate-pulse rounded bg-stone-200" />
+            ) : (
+              `${stats?.pending_purchases_count || 0}`
+            )}
+          </div>
           <p className="mt-1 text-xs text-amber-800">Awaiting purchase sign-off</p>
         </article>
 
@@ -208,9 +223,13 @@ export default function ManagerDashboard({ onOpenPasswordModal }) {
           <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">
             Staff on Duty
           </span>
-          <p className="mt-2 text-2xl font-extrabold text-stone-900">
-            {isLoading ? "…" : `${stats?.active_team_count || 0}`}
-          </p>
+          <div className="mt-2 text-2xl font-extrabold text-stone-900">
+            {isLoading && !stats ? (
+              <span className="inline-block h-6 w-12 animate-pulse rounded bg-stone-200" />
+            ) : (
+              `${stats?.active_team_count || 0}`
+            )}
+          </div>
           <p className="mt-1 text-xs text-stone-500">Active roster accounts</p>
         </article>
       </section>

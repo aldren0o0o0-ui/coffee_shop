@@ -40,4 +40,5 @@ htmlcov/
 
 # Runtime-generated customer documents and test artifacts
 backend/uploads/receipts/
+uploads/menu/
 backend/tests/.test_database.sqlite3

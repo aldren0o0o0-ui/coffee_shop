@@ -23,7 +23,11 @@ export default function InventoryStaffDashboard({ onOpenPasswordModal }) {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 30000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadData();
+      }
+    }, 60000);
     return () => clearInterval(interval);
   }, [loadData]);
 

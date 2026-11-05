@@ -35,8 +35,14 @@ def get_dashboard_overview(
     authentication: CurrentAuthenticationDependency,
     database: DatabaseDependency,
     branch_id: int | None = Query(default=None),
+    role: str | None = Query(default=None),
 ) -> CombinedDashboardResponse:
-    return get_combined_dashboard_overview(database, authentication.user, branch_id=branch_id)
+    return get_combined_dashboard_overview(
+        database,
+        authentication.user,
+        branch_id=branch_id,
+        role=role,
+    )
 
 
 @router.get("/barista-queue", response_model=BaristaDashboardStats)

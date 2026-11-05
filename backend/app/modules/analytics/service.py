@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import time
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -584,7 +585,20 @@ def get_inventory_dashboard_stats(database: Session) -> InventoryStaffDashboardS
     )
 
 
-def get_combined_dashboard_overview(database: Session, user: User, branch_id: int | None = None) -> CombinedDashboardResponse:
+_STORE_REPORTS_CACHE: dict[str, tuple[float, StoreReportResponse]] = {}
+_STORE_REPORTS_CACHE_TTL_SECONDS = 30.0  # 30-second TTL to avoid pounding cloud DB during polling
+
+
+def clear_store_reports_cache() -> None:
+    _STORE_REPORTS_CACHE.clear()
+
+
+def get_combined_dashboard_overview(
+    database: Session,
+    user: User,
+    branch_id: int | None = None,
+    role: str | None = None,
+) -> CombinedDashboardResponse:
     user_roles = [r.role.role_name.lower() for r in user.user_roles if r.is_active and r.role.is_active]
 
     primary_role = "cashier"
@@ -597,12 +611,15 @@ def get_combined_dashboard_overview(database: Session, user: User, branch_id: in
     elif "inventory staff" in user_roles or "inventory_staff" in user_roles:
         primary_role = "inventory"
 
+    # Only execute expensive database queries for the requested or primary role
+    target_role = (role.lower().strip() if role else primary_role)
+
     effective_branch_id = branch_id if branch_id is not None else getattr(user, "branch_id", None)
-    owner_stats = get_owner_dashboard_stats(database, branch_id=effective_branch_id)
-    manager_stats = get_manager_dashboard_stats(database)
-    cashier_stats = get_cashier_dashboard_stats(database)
-    barista_stats = get_barista_queue(database)
-    inventory_stats = get_inventory_dashboard_stats(database)
+    owner_stats = get_owner_dashboard_stats(database, branch_id=effective_branch_id) if target_role in ("owner", "all") else None
+    manager_stats = get_manager_dashboard_stats(database) if target_role in ("manager", "all") else None
+    cashier_stats = get_cashier_dashboard_stats(database) if target_role in ("cashier", "all") else None
+    barista_stats = get_barista_queue(database) if target_role in ("barista", "all") else None
+    inventory_stats = get_inventory_dashboard_stats(database) if target_role in ("inventory", "all") else None
 
     return CombinedDashboardResponse(
         role=primary_role,
@@ -614,10 +631,20 @@ def get_combined_dashboard_overview(database: Session, user: User, branch_id: in
     )
 
 
-def generate_store_reports(database: Session, period: str = "today") -> StoreReportResponse:
+def generate_store_reports(database: Session, period: str = "today", use_cache: bool = True) -> StoreReportResponse:
     """
     Generates consolidated reporting analytics for Manager and Owner roles.
+    Includes a 30-second memory cache to eliminate redundant heavy SQL aggregations during polling.
     """
+    cache_key = period.lower().strip()
+    now_ts = time.time()
+    if use_cache:
+        cached = _STORE_REPORTS_CACHE.get(cache_key)
+        if cached is not None:
+            cached_at, cached_report = cached
+            if now_ts - cached_at < _STORE_REPORTS_CACHE_TTL_SECONDS:
+                return cached_report
+
     store_tz = get_store_timezone()
     now_local = datetime.now(store_tz)
     if period == "today":
@@ -888,3 +915,8 @@ def generate_store_reports(database: Session, period: str = "today") -> StoreRep
         sales_by_payment_method=sales_by_payment_method,
         timeline=timeline,
     )
+
+    if use_cache:
+        _STORE_REPORTS_CACHE[cache_key] = (now_ts, response)
+
+    return response

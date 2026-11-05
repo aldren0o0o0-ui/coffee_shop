@@ -21,8 +21,7 @@ export default function CashierDashboard({ onOpenPasswordModal }) {
 
   const loadData = useCallback(async () => {
     try {
-      setIsLoading(true);
-      const overview = await fetchDashboardOverview();
+      const overview = await fetchDashboardOverview(null, "cashier");
       if (overview?.cashier_stats) {
         setStats(overview.cashier_stats);
       }
@@ -48,7 +47,11 @@ export default function CashierDashboard({ onOpenPasswordModal }) {
   useEffect(() => {
     loadData();
     loadMenu();
-    const interval = setInterval(loadData, 20000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadData();
+      }
+    }, 60000);
     return () => clearInterval(interval);
   }, [loadData, loadMenu]);
 
