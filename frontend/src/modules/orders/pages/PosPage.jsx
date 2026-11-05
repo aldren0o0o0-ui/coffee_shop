@@ -142,11 +142,10 @@ function ProductCard({
                       type="button"
                       disabled={!item.is_available}
                       onClick={() => setSelectedSize(s)}
-                      className={`rounded-full px-3 py-1 text-xs font-bold transition shadow-2xs ${
-                        isSelected
-                          ? "bg-stone-900 text-white shadow-xs"
-                          : "border border-stone-200 bg-stone-50/80 text-stone-600 hover:border-stone-400 hover:bg-stone-100"
-                      }`}
+                      className={`rounded-full px-3 py-1 text-xs font-bold transition shadow-2xs ${isSelected
+                        ? "bg-stone-900 text-white shadow-xs"
+                        : "border border-stone-200 bg-stone-50/80 text-stone-600 hover:border-stone-400 hover:bg-stone-100"
+                        }`}
                     >
                       {s.size_name}
                     </button>
@@ -201,11 +200,10 @@ function ProductCard({
           type="button"
           disabled={!item.is_available}
           onClick={handleAdd}
-          className={`rounded-full px-5 py-2 text-xs font-bold transition-all duration-200 shadow-xs ${
-            isButtonActive
-              ? "bg-amber-800 text-white hover:bg-amber-900"
-              : "border border-amber-800/40 text-amber-800 hover:bg-amber-800 hover:text-white"
-          } disabled:cursor-not-allowed disabled:opacity-50`}
+          className={`rounded-full px-5 py-2 text-xs font-bold transition-all duration-200 shadow-xs ${isButtonActive
+            ? "bg-amber-800 text-white hover:bg-amber-900"
+            : "border border-amber-800/40 text-amber-800 hover:bg-amber-800 hover:text-white"
+            } disabled:cursor-not-allowed disabled:opacity-50`}
         >
           {isButtonActive ? "Added to cart" : "Add to Cart"}
         </button>
@@ -777,22 +775,20 @@ export default function PosPage() {
                   <button
                     type="button"
                     onClick={() => setAvailabilityFilter("all")}
-                    className={`rounded-xl py-1.5 text-xs font-bold transition ${
-                      availabilityFilter === "all"
-                        ? "bg-stone-900 text-white"
-                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                    }`}
+                    className={`rounded-xl py-1.5 text-xs font-bold transition ${availabilityFilter === "all"
+                      ? "bg-stone-900 text-white"
+                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                      }`}
                   >
                     All Items
                   </button>
                   <button
                     type="button"
                     onClick={() => setAvailabilityFilter("in_stock")}
-                    className={`rounded-xl py-1.5 text-xs font-bold transition ${
-                      availabilityFilter === "in_stock"
-                        ? "bg-stone-900 text-white"
-                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                    }`}
+                    className={`rounded-xl py-1.5 text-xs font-bold transition ${availabilityFilter === "in_stock"
+                      ? "bg-stone-900 text-white"
+                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                      }`}
                   >
                     In Stock Only
                   </button>
@@ -823,11 +819,10 @@ export default function PosPage() {
             <button
               type="button"
               onClick={() => setActiveMode("register")}
-              className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
-                activeMode === "register"
-                  ? "bg-amber-800 text-white shadow-xs"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
+              className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${activeMode === "register"
+                ? "bg-amber-800 text-white shadow-xs"
+                : "text-stone-600 hover:text-stone-900"
+                }`}
             >
               New Sale
             </button>
@@ -835,11 +830,10 @@ export default function PosPage() {
             <button
               type="button"
               onClick={() => setActiveMode("lookup")}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-                activeMode === "lookup"
-                  ? "bg-amber-800 text-white shadow-xs"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${activeMode === "lookup"
+                ? "bg-amber-800 text-white shadow-xs"
+                : "text-stone-600 hover:text-stone-900"
+                }`}
             >
               <span>Pending Orders</span>
               {lookupResults.length > 0 && (
@@ -918,11 +912,10 @@ export default function PosPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedCategory("all")}
-                  className={`rounded-full px-5 py-2 text-xs font-bold transition shadow-xs whitespace-nowrap ${
-                    selectedCategory === "all"
-                      ? "bg-amber-800 text-white"
-                      : "border border-stone-200/90 bg-white text-stone-600 hover:bg-stone-50"
-                  }`}
+                  className={`rounded-full px-5 py-2 text-xs font-bold transition shadow-xs whitespace-nowrap ${selectedCategory === "all"
+                    ? "bg-amber-800 text-white"
+                    : "border border-stone-200/90 bg-white text-stone-600 hover:bg-stone-50"
+                    }`}
                 >
                   All Items ({allItems.length})
                 </button>
@@ -934,11 +927,10 @@ export default function PosPage() {
                       key={cat.category_id}
                       type="button"
                       onClick={() => setSelectedCategory(cat.category_name)}
-                      className={`rounded-full px-5 py-2 text-xs font-bold transition shadow-xs whitespace-nowrap ${
-                        isSelected
-                          ? "bg-amber-800 text-white"
-                          : "border border-stone-200/90 bg-white text-stone-600 hover:bg-stone-50"
-                      }`}
+                      className={`rounded-full px-5 py-2 text-xs font-bold transition shadow-xs whitespace-nowrap ${isSelected
+                        ? "bg-amber-800 text-white"
+                        : "border border-stone-200/90 bg-white text-stone-600 hover:bg-stone-50"
+                        }`}
                     >
                       {cat.category_name}
                     </button>
@@ -1042,26 +1034,15 @@ export default function PosPage() {
 
                 {/* ORDER TYPE TOGGLE PILLS (Delivery / Dine in / Take away) */}
                 <div className="grid grid-cols-3 gap-1.5 p-1 bg-stone-100/90 rounded-full">
-                  <button
-                    type="button"
-                    onClick={() => setOrderType("delivery")}
-                    className={`rounded-full py-1.5 text-xs font-bold transition text-center ${
-                      orderType === "delivery"
-                        ? "bg-stone-900 text-white shadow-xs"
-                        : "text-stone-600 hover:text-stone-900"
-                    }`}
-                  >
-                    Delivery
-                  </button>
+
 
                   <button
                     type="button"
                     onClick={() => setOrderType("dine_in")}
-                    className={`rounded-full py-1.5 text-xs font-bold transition text-center ${
-                      orderType === "dine_in"
-                        ? "bg-stone-900 text-white shadow-xs"
-                        : "text-stone-600 hover:text-stone-900"
-                    }`}
+                    className={`rounded-full py-1.5 text-xs font-bold transition text-center ${orderType === "dine_in"
+                      ? "bg-stone-900 text-white shadow-xs"
+                      : "text-stone-600 hover:text-stone-900"
+                      }`}
                   >
                     Dine in
                   </button>
@@ -1069,11 +1050,10 @@ export default function PosPage() {
                   <button
                     type="button"
                     onClick={() => setOrderType("takeout")}
-                    className={`rounded-full py-1.5 text-xs font-bold transition text-center ${
-                      orderType === "takeout"
-                        ? "bg-stone-900 text-white shadow-xs"
-                        : "text-stone-600 hover:text-stone-900"
-                    }`}
+                    className={`rounded-full py-1.5 text-xs font-bold transition text-center ${orderType === "takeout"
+                      ? "bg-stone-900 text-white shadow-xs"
+                      : "text-stone-600 hover:text-stone-900"
+                      }`}
                   >
                     Take away
                   </button>
@@ -1201,25 +1181,14 @@ export default function PosPage() {
                       <button
                         type="button"
                         onClick={() => setPaymentMethod("cash")}
-                        className={`rounded-full px-3 py-1 font-bold transition ${
-                          paymentMethod === "cash"
-                            ? "bg-stone-900 text-white"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
+                        className={`rounded-full px-3 py-1 font-bold transition ${paymentMethod === "cash"
+                          ? "bg-stone-900 text-white"
+                          : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                          }`}
                       >
                         Cash
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod("card")}
-                        className={`rounded-full px-3 py-1 font-bold transition ${
-                          paymentMethod === "card"
-                            ? "bg-stone-900 text-white"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
-                      >
-                        Card
-                      </button>
+
                     </div>
 
                     {paymentMethod === "cash" && (
@@ -1335,11 +1304,10 @@ export default function PosPage() {
                       key={order.order_id}
                       type="button"
                       onClick={() => handleSelectPendingOrder(order)}
-                      className={`text-left rounded-3xl p-5 border transition-all duration-200 flex flex-col justify-between ${
-                        isSelected
-                          ? "border-amber-800 bg-amber-50/50 shadow-md ring-2 ring-amber-300"
-                          : "border-stone-200/90 bg-white hover:border-amber-700/40 hover:shadow-xs"
-                      }`}
+                      className={`text-left rounded-3xl p-5 border transition-all duration-200 flex flex-col justify-between ${isSelected
+                        ? "border-amber-800 bg-amber-50/50 shadow-md ring-2 ring-amber-300"
+                        : "border-stone-200/90 bg-white hover:border-amber-700/40 hover:shadow-xs"
+                        }`}
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2">
@@ -1517,22 +1485,20 @@ export default function PosPage() {
                           <button
                             type="button"
                             onClick={() => setCounterPaymentMethod("cash")}
-                            className={`rounded-full px-3 py-1 font-bold transition ${
-                              counterPaymentMethod === "cash"
-                                ? "bg-stone-900 text-white"
-                                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                            }`}
+                            className={`rounded-full px-3 py-1 font-bold transition ${counterPaymentMethod === "cash"
+                              ? "bg-stone-900 text-white"
+                              : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                              }`}
                           >
                             Cash
                           </button>
                           <button
                             type="button"
                             onClick={() => setCounterPaymentMethod("card")}
-                            className={`rounded-full px-3 py-1 font-bold transition ${
-                              counterPaymentMethod === "card"
-                                ? "bg-stone-900 text-white"
-                                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                            }`}
+                            className={`rounded-full px-3 py-1 font-bold transition ${counterPaymentMethod === "card"
+                              ? "bg-stone-900 text-white"
+                              : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                              }`}
                           >
                             Card
                           </button>
@@ -1620,11 +1586,10 @@ export default function PosPage() {
                       key={s.menu_item_size_id}
                       type="button"
                       onClick={() => setSelectedSize(s)}
-                      className={`p-2.5 rounded-2xl border text-xs font-bold flex justify-between transition ${
-                        selectedSize?.menu_item_size_id === s.menu_item_size_id
-                          ? "border-amber-800 bg-amber-50 text-amber-950 ring-2 ring-amber-300"
-                          : "border-stone-200 text-stone-700 hover:bg-stone-50"
-                      }`}
+                      className={`p-2.5 rounded-2xl border text-xs font-bold flex justify-between transition ${selectedSize?.menu_item_size_id === s.menu_item_size_id
+                        ? "border-amber-800 bg-amber-50 text-amber-950 ring-2 ring-amber-300"
+                        : "border-stone-200 text-stone-700 hover:bg-stone-50"
+                        }`}
                     >
                       <span>{s.size_name}</span>
                       <span>
@@ -1650,9 +1615,8 @@ export default function PosPage() {
                     return (
                       <label
                         key={a.menu_item_addon_id}
-                        className={`flex items-center justify-between p-2.5 rounded-2xl border text-xs font-bold cursor-pointer transition ${
-                          isChecked ? "border-amber-800 bg-amber-50 text-amber-950" : "border-stone-200 text-stone-700"
-                        }`}
+                        className={`flex items-center justify-between p-2.5 rounded-2xl border text-xs font-bold cursor-pointer transition ${isChecked ? "border-amber-800 bg-amber-50 text-amber-950" : "border-stone-200 text-stone-700"
+                          }`}
                       >
                         <div className="flex items-center gap-2">
                           <input
